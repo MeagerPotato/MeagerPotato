@@ -12,7 +12,8 @@
 
 <!-- ascii portrait (left) + streak/numbers card (right). both svgs are
      840x880 so equal widths give equal heights.
-     portrait: python scripts/prep_photo.py <photo.png> && python scripts/make_ascii_svg.py
+     portrait: PHOTO=1 python scripts/prep_photo.py <photo.png> && python scripts/make_ascii_svg.py
+     (needs opencv-python-headless on top of scripts/requirements.txt)
      stats:    python scripts/render_stats_svg.py (same daily workflow) -->
 
 <h3><code>allen@github ~ $ whoami</code></h3>

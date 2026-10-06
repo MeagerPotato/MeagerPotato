@@ -25,7 +25,7 @@ OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "..", "portrait-a
 
 # more columns = more detail (eyes need ~6+ chars across to read). the art
 # stays ART_W px wide either way; cells shrink, keeping a ~1:1.875 char aspect.
-COLS = int(os.environ.get("COLS", 180))
+COLS = int(os.environ.get("COLS", 300))
 ART_W_TARGET = 800
 CELL_W = ART_W_TARGET / COLS
 CELL_H = CELL_W * 15 / 8

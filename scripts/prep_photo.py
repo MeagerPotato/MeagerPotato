@@ -12,6 +12,14 @@ Prepare the dp (a flat illustration) for clean ASCII conversion:
 Output: source-prepped.png (grayscale), consumed by make_ascii_svg.py.
 
     python scripts/prep_photo.py <input.png> [output.png]
+
+PHOTO=1 switches to photo mode, for a real photograph instead of a drawing:
+local contrast (CLAHE), a light smooth, a soft vignette that fades the corners
+out, and the tones INVERTED, so that on the dark terminal bright fur prints as
+dense characters and dark eyes stay empty (a drawing wants the opposite: its
+dark lines are what should print).
+
+    PHOTO=1 python scripts/prep_photo.py <photo.png> [output.png]
 """
 import os
 import sys
@@ -29,6 +37,22 @@ INP = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "source-pho
 OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "..", "source-prepped.png")
 
 LINE_WEIGHT = 0.6     # how hard drawn lines are pushed toward black
+
+if os.environ.get("PHOTO"):
+    gray = np.array(Image.open(INP).convert("L"))
+    side = min(gray.shape)
+    y0, x0 = (gray.shape[0] - side) // 2, (gray.shape[1] - side) // 2
+    gray = gray[y0:y0 + side, x0:x0 + side]
+    gray = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8)).apply(gray)
+    gray = cv2.bilateralFilter(gray, 9, 35, 9)
+    lo, hi = np.percentile(gray, [3, 99])
+    tone = np.clip((gray.astype(np.float32) - lo) / (hi - lo), 0, 1) ** 1.25
+    yy, xx = np.mgrid[0:side, 0:side].astype(np.float32)
+    r = np.hypot(xx - side / 2, yy - side / 2) / (side / 2)
+    tone *= np.clip((1.28 - r) / 0.30, 0, 1)      # full inside r=0.98, gone by 1.28
+    Image.fromarray(((1.0 - tone) * 255).astype(np.uint8), mode="L").save(OUT)
+    print("wrote", OUT, (side, side), "(photo mode)")
+    sys.exit(0)
 
 # 1. cut out the subject
 cut = Image.open(INP).convert("RGBA")
