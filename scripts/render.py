@@ -18,11 +18,8 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 DATA = os.path.join(ROOT, "data")
 OUT = os.path.join(ROOT, "profile")
 
-try:
-    from zoneinfo import ZoneInfo
-    TZ = ZoneInfo("America/Los_Angeles")
-except Exception:  # noqa: BLE001 - fall back to UTC if tz data is missing
-    TZ = datetime.timezone.utc
+# GitHub's calendar dates are UTC, so the "synced" date uses UTC too and the two always agree
+TZ = datetime.timezone.utc
 
 W = 880
 BG = "#0a0e17"
@@ -178,6 +175,8 @@ def hero(st, synced):
     stars = []
     for n in range(90):
         x, y = rnd.uniform(14, W - 14), rnd.uniform(14, h - 14)
+        if x < 470 and 30 < y < 215 and n % 3:
+            continue  # keep the area behind the name mostly clear
         r = rnd.choice([0.6, 0.8, 0.8, 1.0, 1.3])
         o = rnd.uniform(0.25, 0.8)
         tw = f' class="tw" style="animation-delay:{rnd.uniform(0, 4):.2f}s"' if n % 4 == 0 else ""
