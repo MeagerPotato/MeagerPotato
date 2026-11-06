@@ -81,15 +81,23 @@ def blurb(repo):
 
 def is_noise(msg):
     first = msg.splitlines()[0] if msg else ""
-    return "[skip ci]" in msg or first.startswith(("Merge pull request", "Merge branch", "Merge remote-tracking"))
+    return "[skip ci]" in msg or first.startswith(
+        ("Merge pull request", "Merge branch", "Merge remote-tracking", "Bump ", "build(deps"))
+
+
+def is_bot(login):
+    return login.endswith("[bot]") or login.lower() in {"dependabot", "renovate", "github-actions"}
 
 
 def repo_activity(repo):
     name = repo["full_name"]
     commits = get(f"/repos/{name}/commits", since=SINCE.isoformat(), per_page=100)
-    commits = [c for c in commits if len(c.get("parents", [])) < 2 and not is_noise(c["commit"]["message"])]
+    commits = [c for c in commits if len(c.get("parents", [])) < 2 and not is_noise(c["commit"]["message"])
+               and not is_bot((c.get("author") or {}).get("login", ""))]
 
+    # only Allen's own PRs; dependency bots don't count as "what he's been up to"
     pulls = get(f"/repos/{name}/pulls", state="all", sort="updated", direction="desc", per_page=50)
+    pulls = [p for p in pulls if p["user"]["login"].lower() == USER.lower()]
     opened = [p for p in pulls if ts(p["created_at"]) >= SINCE]
     merged = [p for p in pulls if p.get("merged_at") and ts(p["merged_at"]) >= SINCE]
     still_open = [p for p in opened if p["state"] == "open"]
@@ -101,8 +109,9 @@ def repo_activity(repo):
                for c in commits]
     highlights, seen = [], set()
     for when, title, kind in sorted(events, key=lambda e: e[0], reverse=True):
-        if title and title not in seen:
-            seen.add(title)
+        key = re.sub(r"\s*\(#\d+\)$", "", title or "")  # a squash-merge commit repeats its PR title
+        if key and key not in seen:
+            seen.add(key)
             highlights.append({"title": title, "kind": kind, "date": when[:10]})
 
     dates = [ts(c["commit"]["committer"]["date"]) for c in commits]
@@ -165,7 +174,7 @@ def collect(repos):
         except Exception as e:  # noqa: BLE001 - skip one broken repo, keep the rest
             print(f"{r['full_name']}: {e}", file=sys.stderr)
             continue
-        if a["commits"] or a["prs_opened"] or a["prs_merged"]:
+        if a["highlights"]:
             items.append(a)
     items += outside_prs()
     items.sort(key=lambda a: a["last_active"], reverse=True)
