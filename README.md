@@ -13,7 +13,7 @@
 
 <img src="./profile/recent.svg" width="100%" alt="What Allen has been working on recently" />
 
-<sub><a href="https://github.com/MeagerPotato/backburner">backburner</a></sub>
+<sub><a href="https://github.com/MeagerPotato/backburner">backburner</a> · <a href="https://github.com/MeagerPotato/days2meet">days2meet</a> · <a href="https://github.com/MeagerPotato/Personal-Website">Personal-Website</a> · <a href="https://github.com/MeagerPotato/hearsay-dh-squad">hearsay-dh-squad</a></sub>
 
 <br><br>
 
