@@ -1,42 +1,23 @@
+<!--
+  This README is rebuilt by scripts/render.py every few hours.
+  Edit profile/README.template.md instead, or your changes will be overwritten.
+-->
+
 <div align="center">
 
-<!-- animated contribution graph: real data, boxes reveal cell by cell
-     (regenerated daily by .github/workflows/update-profile-art.yml) -->
+<img src="./profile/hero.svg" width="100%" alt="Allen Hsieh, Aerospace Engineering at UC Berkeley" />
 
-<h3><code>allen@github ~ $ ./contributions.sh</code></h3>
+<img src="./profile/streak.svg" width="100%" alt="Current and longest contribution streaks" />
 
-<img src="./contrib-heatmap.svg" width="860" alt="Allen's GitHub contribution graph, refreshed daily" />
+<img src="./profile/contributions.svg" width="100%" alt="Contribution graph for the last year" />
 
-<br>
-<br>
+<img src="./profile/recent.svg" width="100%" alt="What Allen has been working on recently" />
 
-<!-- ascii portrait (left) + streak/numbers card (right). both svgs are
-     840x880 so equal widths give equal heights.
-     portrait: PHOTO=1 python scripts/prep_photo.py <photo.png> && python scripts/make_ascii_svg.py
-     (needs opencv-python-headless on top of scripts/requirements.txt)
-     stats:    python scripts/render_stats_svg.py (same daily workflow) -->
+<sub><a href="https://github.com/MeagerPotato/backburner">backburner</a> · <a href="https://github.com/MeagerPotato/Personal-Website">Personal-Website</a></sub>
 
-<h3><code>allen@github ~ $ whoami</code></h3>
+<br><br>
 
-<table>
-<tr>
-<td valign="top"><img src="./portrait-ascii.svg" width="420" alt="ASCII portrait" /></td>
-<td valign="top"><img src="./stats.svg" width="420" alt="Allen's GitHub streak and contribution stats, refreshed daily" /></td>
-</tr>
-</table>
-
-<br>
-<br>
-
-<h3><code>allen@github ~ $ ./links.sh</code></h3>
-
-<p><b>Aerospace Engineering @ UC Berkeley · Rockets · Robots · Software</b></p>
-
-[![Website](https://img.shields.io/badge/Website-allenkh.com-0d1117?style=for-the-badge&logo=rocket&logoColor=white)](https://allenkh.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-allenkhsieh-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/allenkhsieh)
-
-<br>
-
-<sub>Profile design forked from <a href="https://github.com/AVIVASHISHTA29/AVIVASHISHTA29">AVIVASHISHTA29</a>.</sub>
+<a href="https://allenkh.com"><img src="https://img.shields.io/badge/allenkh.com-0a0e17?style=for-the-badge&logo=rocket&logoColor=ff8a3d" alt="Website" /></a>
+<a href="https://www.linkedin.com/in/allenkhsieh"><img src="https://img.shields.io/badge/LinkedIn-0a0e17?style=for-the-badge&logo=linkedin&logoColor=7dd3fc" alt="LinkedIn" /></a>
 
 </div>
