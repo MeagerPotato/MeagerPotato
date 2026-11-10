@@ -311,8 +311,10 @@ def graph(days, st):
             seen.update({c, key})
             if c < cols - 1 and not (n == 0 and dt.day > 21):
                 months.append(f'<text x="{cx}" y="{top - 10}" font-size="11.5" fill="{MUTED}">{dt:%b}</text>')
-        delay = c * 0.035 + row * 0.01
-        today = ' class="c today"' if x["date"] == st["today"] else ' class="c"'
+        # the graph floods in left to right; days with activity flash as the wave passes
+        delay = c * 0.065 + row * 0.02
+        cls = "c g" if x["level"] else "c"
+        today = f' class="{cls} today"' if x["date"] == st["today"] else f' class="{cls}"'
         tip = f"{x['count']} on {mdy(dt)}"
         rects.append(f'<rect{today} x="{cx}" y="{cy}" width="{cell}" height="{cell}" rx="2.5" '
                      f'fill="{LEVELS[x["level"]]}" style="animation-delay:{delay:.2f}s"><title>{tip}</title></rect>')
@@ -338,7 +340,9 @@ def graph(days, st):
 {legend}'''
     style = (".c{animation:pop .45s ease-out both;transform-box:fill-box;transform-origin:center}"
              "@keyframes pop{from{opacity:0;transform:scale(.3)}}"
-             f".today{{stroke:{GLOW};stroke-width:1.2;animation:pop .45s ease-out both,blink 2s ease-in-out 2.4s infinite}}"
+             ".g{animation:pop .45s ease-out both,flash .8s ease-out both}"
+             "@keyframes flash{0%,40%{filter:brightness(2.4)}100%{filter:brightness(1)}}"
+             f".today{{stroke:{GLOW};stroke-width:1.2;animation:pop .45s ease-out both,blink 2s ease-in-out 4s infinite}}"
              "@keyframes blink{50%{stroke-opacity:.15}}")
     return svg(h, body, style)
 
