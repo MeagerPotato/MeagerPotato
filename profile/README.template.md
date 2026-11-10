@@ -7,8 +7,6 @@
 
 <a href="https://allenkh.com"><img src="./profile/hero.svg" width="100%" alt="Allen Hsieh, Aerospace Engineering at UC Berkeley" /></a>
 
-<sub>{{LINKS}}</sub>
-
 <img src="./profile/streak.svg" width="100%" alt="Current and longest contribution streaks" />
 
 <img src="./profile/contributions.svg" width="100%" alt="Contribution graph for the last year" />

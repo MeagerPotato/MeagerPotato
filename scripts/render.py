@@ -472,7 +472,7 @@ def activity(act):
 # ---------------------------------------------------------------- links
 
 # An image in a README can carry one link. So the banner shows the three addresses as tags and links to the
-# first, and all three are also real text links in the line right under it.
+# first; the other two are there to read, not to click.
 LINKS = [
     ("site", "https://allenkh.com", "allenkh.com", BUTTER),
     ("linkedin", "https://www.linkedin.com/in/allenkhsieh", "in/allenkhsieh", SKY),
@@ -486,8 +486,7 @@ def readme(act):
     with open(os.path.join(OUT, "README.template.md")) as f:
         tpl = f.read()
     links = " · ".join(f'<a href="{esc(r["url"])}">{esc(r["name"])}</a>' for r in act.get("repos", []))
-    mine = " · ".join(f'<a href="{esc(url)}">{esc(text)}</a>' for _, url, text, _ in LINKS)
-    return tpl.replace("{{RECENT_LINKS}}", links or "&nbsp;").replace("{{LINKS}}", mine)
+    return tpl.replace("{{RECENT_LINKS}}", links or "&nbsp;")
 
 
 def main():
