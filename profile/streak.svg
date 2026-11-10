@@ -10,39 +10,39 @@
 <circle cx="44" cy="40" r="4" fill="#f19389"/><text x="56" y="44" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" font-weight="600" letter-spacing="2" fill="#f19389" text-anchor="start">STREAK</text>
 <circle cx="160" cy="148" r="84" fill="none" stroke="#121a36" stroke-width="14"/>
 <circle cx="160" cy="148" r="84" fill="none" stroke="#2c3a6b" stroke-width="1" stroke-dasharray="2 5" opacity="0.9"/>
-<circle class="arc" opacity="0" cx="160" cy="148" r="84" fill="none" stroke="url(#plume)" stroke-width="14"
-  stroke-linecap="round" stroke-dasharray="0.0 527.8" transform="rotate(-90 160 148)"
-  style="--len:0.0"/>
-<text x="160" y="162" font-size="58" font-weight="700" fill="#f1f3fb" text-anchor="middle">0</text>
+<circle class="arc" opacity="1" cx="160" cy="148" r="84" fill="none" stroke="url(#plume)" stroke-width="14"
+  stroke-linecap="round" stroke-dasharray="527.8 527.8" transform="rotate(-90 160 148)"
+  style="--len:527.8"/>
+<text x="160" y="162" font-size="58" font-weight="700" fill="#f1f3fb" text-anchor="middle">17</text>
 <text x="160" y="186" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="12" fill="#b9c1dc" text-anchor="middle">day streak</text>
-<text x="160" y="258" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="12" fill="#8e98ba" text-anchor="middle">last active Nov 5</text>
+<text x="160" y="258" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="12" fill="#8e98ba" text-anchor="middle">since Oct 25</text>
 
 <g class="tile" style="animation-delay:0.15s">
   <rect x="330" y="31" width="251" height="106" rx="10" fill="#060914"/><rect x="330" y="28" width="251" height="106" rx="10" fill="#121a36" stroke="#2c3a6b" stroke-width="2"/>
   <text x="348" y="56" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" font-weight="600" letter-spacing="2" fill="#8e98ba" text-anchor="start">LONGEST STREAK</text>
-  <text x="347" y="96" font-size="34" font-weight="700" fill="#f1f3fb">14</text>
-  <text x="388" y="96" font-size="15" fill="#b9c1dc">days</text>
-  <text x="348" y="118" font-size="12.5" fill="#8e98ba">Aug 29 to Sep 11</text>
+  <text x="347" y="96" font-size="34" font-weight="700" fill="#f1f3fb">17</text>
+  <text x="385" y="96" font-size="15" fill="#b9c1dc">days</text>
+  <text x="348" y="118" font-size="12.5" fill="#8e98ba">Oct 25 to Nov 10</text>
 </g>
 <g class="tile" style="animation-delay:0.27s">
   <rect x="595" y="31" width="251" height="106" rx="10" fill="#060914"/><rect x="595" y="28" width="251" height="106" rx="10" fill="#121a36" stroke="#2c3a6b" stroke-width="2"/>
   <text x="613" y="56" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" font-weight="600" letter-spacing="2" fill="#8e98ba" text-anchor="start">WEEKLY STREAK</text>
-  <text x="612" y="96" font-size="34" font-weight="700" fill="#f1f3fb">14</text>
-  <text x="653" y="96" font-size="15" fill="#b9c1dc">weeks</text>
+  <text x="612" y="96" font-size="34" font-weight="700" fill="#f1f3fb">15</text>
+  <text x="651" y="96" font-size="15" fill="#b9c1dc">weeks</text>
   <text x="613" y="118" font-size="12.5" fill="#8e98ba">weeks in a row with activity</text>
 </g>
 <g class="tile" style="animation-delay:0.39s">
   <rect x="330" y="151" width="251" height="106" rx="10" fill="#060914"/><rect x="330" y="148" width="251" height="106" rx="10" fill="#121a36" stroke="#2c3a6b" stroke-width="2"/>
   <text x="348" y="176" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" font-weight="600" letter-spacing="2" fill="#8e98ba" text-anchor="start">CONTRIBUTIONS</text>
-  <text x="347" y="216" font-size="34" font-weight="700" fill="#f1f3fb">1,100</text>
-  <text x="435" y="216" font-size="15" fill="#b9c1dc"></text>
-  <text x="348" y="238" font-size="12.5" fill="#8e98ba">59 active days, last 12 months</text>
+  <text x="347" y="216" font-size="34" font-weight="700" fill="#f1f3fb">4,070</text>
+  <text x="448" y="216" font-size="15" fill="#b9c1dc"></text>
+  <text x="348" y="238" font-size="12.5" fill="#8e98ba">91 active days, last 12 months</text>
 </g>
 <g class="tile" style="animation-delay:0.51s">
   <rect x="595" y="151" width="251" height="106" rx="10" fill="#060914"/><rect x="595" y="148" width="251" height="106" rx="10" fill="#121a36" stroke="#2c3a6b" stroke-width="2"/>
   <text x="613" y="176" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" font-weight="600" letter-spacing="2" fill="#8e98ba" text-anchor="start">BEST DAY</text>
-  <text x="612" y="216" font-size="34" font-weight="700" fill="#f1f3fb">124</text>
-  <text x="672" y="216" font-size="15" fill="#b9c1dc"></text>
-  <text x="613" y="238" font-size="12.5" fill="#8e98ba">Sep 19, 2026</text>
+  <text x="612" y="216" font-size="34" font-weight="700" fill="#f1f3fb">312</text>
+  <text x="670" y="216" font-size="15" fill="#b9c1dc"></text>
+  <text x="613" y="238" font-size="12.5" fill="#8e98ba">Oct 29, 2026</text>
 </g>
 </svg>
