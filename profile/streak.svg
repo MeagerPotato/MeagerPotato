@@ -43,7 +43,7 @@
   <rect x="595" y="151" width="251" height="106" rx="10" fill="#060914"/><rect x="595" y="148" width="251" height="106" rx="10" fill="#121a36" stroke="#2c3a6b" stroke-width="2"/>
   <text x="613" y="176" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" font-weight="600" letter-spacing="2" fill="#8e98ba" text-anchor="start">BEST DAY</text>
   <text x="612" y="216" font-size="34" font-weight="700" fill="#f1f3fb">312</text>
-  <text x="670" y="216" font-size="15" fill="#b9c1dc"></text>
+  <text x="670" y="216" font-size="15" fill="#b9c1dc">contributions</text>
   <text x="613" y="238" font-size="12.5" fill="#8e98ba">Oct 29, 2026</text>
 </g>
 </svg>

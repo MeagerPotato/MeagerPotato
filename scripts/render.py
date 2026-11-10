@@ -274,7 +274,7 @@ def streak(st):
         ("LONGEST STREAK", f"{st['longest']}", "days", f"{md(d(ls))} to {md(d(le))}" if ls else "none yet"),
         ("WEEKLY STREAK", f"{st['week_streak']}", "week" if st["week_streak"] == 1 else "weeks", "weeks in a row with activity"),
         ("CONTRIBUTIONS", f"{st['total']:,}", "", f"{st['active_days']} active days, last 12 months"),
-        ("BEST DAY", f"{st['best_day']['count']:,}", "", mdy(d(st["best_day"]["date"]))),
+        ("BEST DAY", f"{st['best_day']['count']:,}", "contribution" if st["best_day"]["count"] == 1 else "contributions", mdy(d(st["best_day"]["date"]))),
     ]
     tx, ty, tw_, th, gap = 330, 28, 251, 106, 14
     tiles_svg = []
