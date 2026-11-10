@@ -6,8 +6,9 @@ Writes the SVG cards into profile/ and rebuilds README.md from
 profile/README.template.md. Everything is plain SVG with CSS animation, because
 GitHub shows README images as <img> and runs no JavaScript inside them.
 
-The banner (profile/hero.svg) is put together here from the layers in profile/banner/,
-which scripts/banner/capture.js renders from a 3D scene: see scripts/banner/README.md.
+The banner is put together here from the layers in profile/banner/, as four pictures that stand side by
+side (profile/hero.svg and hero-*.svg), since each link in it needs a picture of its own. The layers are
+what scripts/banner/capture.js renders from a 3D scene: see scripts/banner/README.md.
 
     python scripts/render.py
     python scripts/render.py --print-launch   # where and when the rocket leaves the streak card, as JSON
@@ -212,6 +213,9 @@ def _layer(name):
         return "data:image/webp;base64," + base64.b64encode(f.read()).decode()
 
 
+SPLIT = 375  # where the banner is cut between the words and the scene: nothing that moves comes left of it
+
+
 def hero(st):
     """The banner: a voxel planet, the purple world that circles it, and the rocket. It is a stack of pictures
     rendered once from the 3D scene (scripts/banner/), moved here by CSS alone:
@@ -226,7 +230,13 @@ def hero(st):
     The page opens without the rocket. The streak card under this one launches it, and it comes up through the
     bottom edge here at the moment and place it left that card (LAUNCH), flies a short arc and takes its place in
     orbit. Two pictures cannot talk to each other on GitHub: they share nothing but the moment the page loaded.
-    With no streak there is no launch, and no rocket here."""
+    With no streak there is no launch, and no rocket here.
+
+    An image in a README carries one link, and the banner shows three addresses. So it is cut into four pictures
+    that stand side by side with nothing between them: a column for each tag (the words above the tag are in its
+    column too), each linked to its own address, and the scene, which is everything that moves. Returns
+    [(name, its share of the banner's width in thousandths of a percent, svg)], left to right: the README is built
+    from the same list."""
     h = 260
     with open(os.path.join(BANNER, "banner.json")) as f:
         B = json.load(f)
@@ -249,7 +259,7 @@ def hero(st):
                 last = f
         return "".join(out) + f"100%{{visibility:{on if flags[0] else off}}}"
 
-    css = [FONT_FACE]
+    css = []
     back, front, late = [], [], ""
 
     # ---- the purple world
@@ -291,39 +301,60 @@ def hero(st):
             f".arr{{visibility:hidden;animation:arr {len(a['frames']) * slot:.3f}s linear {T['enter']}s}}@keyframes arr{{from,to{{visibility:visible}}}}"
             f".a{{opacity:0;animation:on {slot:.4f}s steps(1)}}@keyframes on{{from,to{{opacity:1}}}}")
 
-    # ---- the words: who, what, and the three addresses as tags
-    tags, x = [], 39.6
-    for _, _, text, color in LINKS:
+    # ---- the words: who, what, and the three addresses as tags. The cuts between the columns fall in the
+    # middle of the gaps between the tags.
+    tags, x, cuts, gap = [], 39.6, [0], 6.9
+    for _, _, text, color, _ in LINKS:
         tw = 15.4 * sum(ADVANCE.get(c, 0.5) for c in text)
-        bw = round(tw + 9.7 + 6.2 + 2 * 9.7 + 2, 1)
-        tags.append(f'<rect x="{x}" y="184.6" width="{bw}" height="27" rx="7" fill="{DEEP}"/>'
-                    f'<rect x="{x}" y="182" width="{bw}" height="27" rx="7" fill="{PANEL}" stroke="{LINE}" stroke-width="1.8"/>'
-                    f'<rect x="{x + 10.6:.1f}" y="190.6" width="9.7" height="9.7" rx="2.2" fill="{color}"/>'
-                    f'<text x="{x + 26.5:.1f}" y="200.6" font-size="15.4" fill="{INK}">{esc(text)}</text>')
-        x += bw + 7.9
-    words = ('<g class="in">'
-             f'<text x="39.6" y="65" font-size="15.4" letter-spacing="3.1" fill="{CORAL}">// MEAGERPOTATO</text>'
+        bw = round(tw + 9.7 + 6.2 + 2 * 8.4 + 2, 1)
+        tags.append(f'<rect x="{x:.1f}" y="184.6" width="{bw}" height="27" rx="7" fill="{DEEP}"/>'
+                    f'<rect x="{x:.1f}" y="182" width="{bw}" height="27" rx="7" fill="{PANEL}" stroke="{LINE}" stroke-width="1.8"/>'
+                    f'<rect x="{x + 9.3:.1f}" y="190.6" width="9.7" height="9.7" rx="2.2" fill="{color}"/>'
+                    f'<text x="{x + 25.2:.1f}" y="200.6" font-size="15.4" fill="{INK}">{esc(text)}</text>')
+        x += bw + gap
+        cuts.append(round(x - gap / 2))
+    cuts[-1] = SPLIT
+    # Each column's width in the README is a share of the banner's, in thousandths of a percent, and a browser
+    # works out each picture's height from its own width. So the cuts are moved (by less than a hundredth of a
+    # pixel) to where those shares put them: then every picture has the banner's proportions exactly, and they
+    # all come out the same height. The shares add up to 99.98%: see readme().
+    share = [math.floor((cuts[k + 1] - cuts[k]) / W * 99980) for k in range(len(LINKS))]
+    share.append(99980 - sum(share))
+    cuts = [round(W * sum(share[:k]) / 99980, 4) for k in range(len(share))] + [W]
+    words = (f'<text x="39.6" y="65" font-size="15.4" letter-spacing="3.1" fill="{CORAL}">// MEAGERPOTATO</text>'
              f'<text x="39.6" y="125" font-size="58" letter-spacing="0.6" fill="{DEEP}">Allen Hsieh</text>'
              f'<text x="39.6" y="122" font-size="58" letter-spacing="0.6" fill="{INK}">Allen Hsieh</text>'
              f'<text x="39.6" y="160" font-size="21" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>'
-             + "".join(tags) + "</g>")
-    css.append(".in{animation:in .8s ease-out both}@keyframes in{from{opacity:0;transform:translateY(8px)}}"
-               "@media (prefers-reduced-motion: reduce){*{animation:none!important}.f{display:none}"
+             + "".join(tags))
+    css.append("@media (prefers-reduced-motion: reduce){*{animation:none!important}.f{display:none}"
                ".f.rest{display:inline;opacity:1}.late{visibility:visible}}")
 
     p = B["planet"]
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" font-family="{SANS}">\n'
-        f'<style>{"".join(css)}</style>\n'
-        f'<defs><clipPath id="card"><rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14"/></clipPath>'
-        f'<image id="moon" x="{-m["w"] / 2}" y="{-m["h"] / 2}" width="{m["w"]}" height="{m["h"]}" href="{_layer(m["file"])}"/></defs>\n'
-        f'<rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14" fill="{DEEP}"/>\n'
-        '<g clip-path="url(#card)">\n'
-        f'<image width="{W}" height="{h}" href="{_layer(B["sky"])}"/>\n'
-        + "\n".join(back)
-        + f'\n<image x="{p["x"]}" y="{p["y"]}" width="{p["w"]}" height="{p["h"]}" href="{_layer(p["file"])}"/>\n'
-        + "\n".join(front) + "\n" + late + "\n" + words
-        + f'\n</g>\n<rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14" fill="none" stroke="{LINE}" stroke-width="2"/>\n</svg>\n')
+    left = min([p["x"]] + [r[0] - m["w"] / 2 * r[2] for r in mk]
+               + ([q[0] + fr["dx"] for q, fr in zip(o["path"], o["frames"])] + [fr["x"] for fr in a["frames"]] if live else []))
+    if x - gap + 1 > SPLIT or left < SPLIT:
+        print(f"warning: the banner is cut at x = {SPLIT}, but the tags end at {x - gap:.0f} and the scene begins at {left:.0f}.",
+              file=sys.stderr)
+
+    def piece(x0, x1, style, defs, inside):
+        w = round(x1 - x0, 4)
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="{x0} 0 {w} {h}" font-family="{SANS}">\n'
+            f'<style>{style}</style>\n'
+            f'<defs><clipPath id="card"><rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14"/></clipPath>{defs}</defs>\n'
+            f'<rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14" fill="{DEEP}"/>\n'
+            '<g clip-path="url(#card)">\n'
+            f'<image width="{W}" height="{h}" href="{_layer(B["sky"])}"/>\n'
+            + inside
+            + f'\n</g>\n<rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14" fill="none" stroke="{LINE}" stroke-width="2"/>\n</svg>\n')
+
+    scene = ("\n".join(back)
+             + f'\n<image x="{p["x"]}" y="{p["y"]}" width="{p["w"]}" height="{p["h"]}" href="{_layer(p["file"])}"/>\n'
+             + "\n".join(front) + "\n" + late)
+    moon_def = f'<image id="moon" x="{-m["w"] / 2}" y="{-m["h"] / 2}" width="{m["w"]}" height="{m["h"]}" href="{_layer(m["file"])}"/>'
+    out = [(key, share[k], piece(cuts[k], cuts[k + 1], FONT_FACE, "", words)) for k, (key, *_) in enumerate(LINKS)]
+    out.append(("scene", share[-1], piece(cuts[-2], W, "".join(css), moon_def, scene)))
+    return out
 
 
 LAUNCH = {}  # what the banner above has to know to catch the rocket: filled in by streak()
@@ -765,22 +796,36 @@ def activity(act):
 
 # ---------------------------------------------------------------- links
 
-# An image in a README can carry one link. So the banner shows the three addresses as tags and links to the
-# first; the other two are there to read, not to click.
+# An image in a README can carry one link. So the banner is cut into a column for each of these, and each
+# column links to its own address: (key, address, the tag's text, the tag's colour, the column's alt text)
 LINKS = [
-    ("site", "https://allenkh.com", "allenkh.com", BUTTER),
-    ("linkedin", "https://www.linkedin.com/in/allenkhsieh", "in/allenkhsieh", SKY),
-    ("alai", "https://tryalai.app", "tryalai.app", MINT),
+    ("site", "https://allenkh.com", "allenkh.com", BUTTER, "Allen Hsieh, Aerospace Engineering at UC Berkeley. Website: allenkh.com"),
+    ("linkedin", "https://www.linkedin.com/in/allenkhsieh", "in/allenkhsieh", SKY, "LinkedIn: in/allenkhsieh"),
+    ("alai", "https://tryalai.app", "tryalai.app", MINT, "alai: tryalai.app"),
 ]
+
+
+def banner_file(key):
+    return "hero.svg" if key == "scene" else f"hero-{key}.svg"
 
 
 # ---------------------------------------------------------------- readme
 
-def readme(act):
+def readme(act, pieces):
+    """pieces: the banner's pictures from hero(), left to right. They go on one line with nothing between them,
+    not even a space, so that they stand edge to edge; their widths are shares of the banner's. The shares add
+    up to a hair under 100% (a sixth of a pixel on a desktop), so that a browser that rounds each one up still
+    has room for the last on the same line."""
     with open(os.path.join(OUT, "README.template.md")) as f:
         tpl = f.read()
+    info = {key: (url, alt) for key, url, _, _, alt in LINKS}
+    info["scene"] = (LINKS[0][1], "A voxel planet with a purple world and a rocket in orbit")
+    banner = "".join(
+        f'<a href="{esc(info[key][0])}"><img src="./profile/{banner_file(key)}" '
+        f'width="{share // 1000}.{share % 1000:03d}%" alt="{esc(info[key][1])}" /></a>'
+        for key, share, _ in pieces)
     links = " · ".join(f'<a href="{esc(r["url"])}">{esc(r["name"])}</a>' for r in act.get("repos", []))
-    return tpl.replace("{{RECENT_LINKS}}", links or "&nbsp;")
+    return tpl.replace("{{BANNER}}", banner).replace("{{RECENT_LINKS}}", links or "&nbsp;")
 
 
 def main():
@@ -798,11 +843,13 @@ def main():
         print(json.dumps({k: v for k, v in LAUNCH.items() if k != "active"}))
         return
     write("streak.svg", card)
-    write("hero.svg", hero(st))
+    pieces = hero(st)
+    for key, _, art in pieces:
+        write(banner_file(key), art)
     write("contributions.svg", graph(days, st))
     write("recent.svg", activity(act))
     with open(os.path.join(ROOT, "README.md"), "w") as f:
-        f.write(readme(act))
+        f.write(readme(act, pieces))
     print(f"rendered: streak {st['current']}d (best {st['longest']}d), weekly {st['week_streak']}w, "
           f"{st['total']} contributions, {len(act.get('repos', []))} recent repos")
 
