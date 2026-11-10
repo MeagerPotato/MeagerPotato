@@ -1,0 +1,71 @@
+{
+ "username": "MeagerPotato",
+ "fetched_at": "2026-11-10T22:05:37Z",
+ "window_days": 30,
+ "totals": {
+  "repos": 2,
+  "commits": 15,
+  "prs_merged": 10,
+  "prs_opened": 16
+ },
+ "repos": [
+  {
+   "name": "backburner",
+   "url": "https://github.com/MeagerPotato/backburner",
+   "blurb": "Backburner paces your Claude plan's weekly usage so you use all of it without getting locked out early.",
+   "language": "TypeScript",
+   "stars": 0,
+   "commits": 10,
+   "prs_opened": 8,
+   "prs_merged": 5,
+   "prs_open": 3,
+   "highlights": [
+    {
+     "title": "Run the queue on Codex too, connect other AI tools, and add one-line installers",
+     "kind": "open",
+     "date": "2026-10-28"
+    },
+    {
+     "title": "Let Claude manage Backburner from chat and Claude Code",
+     "kind": "open",
+     "date": "2026-10-28"
+    },
+    {
+     "title": "Quiet the Node 24 warning on Windows and fix the wizard's plugin line",
+     "kind": "open",
+     "date": "2026-10-28"
+    }
+   ],
+   "last_active": "2026-10-28T07:13:35Z"
+  },
+  {
+   "name": "Personal-Website",
+   "url": "https://github.com/MeagerPotato/Personal-Website",
+   "blurb": "Allen's personal site, built as a small universe you can fly through: solar systems are passions, planets are projects, moons are\u2026",
+   "language": "TypeScript",
+   "stars": 0,
+   "commits": 5,
+   "prs_opened": 8,
+   "prs_merged": 5,
+   "prs_open": 4,
+   "highlights": [
+    {
+     "title": "Refresh the site's facts: the Fisher Lab, AFRL, CyberPatriot and VEX",
+     "kind": "open",
+     "date": "2026-10-14"
+    },
+    {
+     "title": "Add design skills for Claude Code: a house set and an exploration set",
+     "kind": "merged",
+     "date": "2026-10-14"
+    },
+    {
+     "title": "Tidy what the go-live left behind",
+     "kind": "open",
+     "date": "2026-10-14"
+    }
+   ],
+   "last_active": "2026-10-14T18:25:32Z"
+  }
+ ]
+}
