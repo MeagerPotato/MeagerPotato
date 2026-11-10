@@ -1,0 +1,481 @@
+<!doctype html>
+<!--
+  The banner's scene: a voxel planet, the purple storm world that circles it, and the rocket.
+  capture.js opens this page, renders the scene in layers and writes them to profile/banner/,
+  where scripts/render.py picks them up and composes profile/hero.svg. Nothing here runs on GitHub.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Banner scene</title>
+<style>html, body { margin: 0; background: #060914; } canvas { display: block; width: 880px; height: 260px; }</style>
+</head>
+<body>
+<canvas id="c-banner"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- seeded noise ----------
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hash3(x, y, z, s) { var h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 2147483647) + Math.imul(s, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+  function vnoise(x, y, z, s) {
+    var xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), xf = smooth(x - xi), yf = smooth(y - yi), zf = smooth(z - zi);
+    function L(a, b, t) { return a + (b - a) * t; }
+    return L(L(L(hash3(xi, yi, zi, s), hash3(xi + 1, yi, zi, s), xf), L(hash3(xi, yi + 1, zi, s), hash3(xi + 1, yi + 1, zi, s), xf), yf),
+             L(L(hash3(xi, yi, zi + 1, s), hash3(xi + 1, yi, zi + 1, s), xf), L(hash3(xi, yi + 1, zi + 1, s), hash3(xi + 1, yi + 1, zi + 1, s), xf), yf), zf) * 2 - 1;
+  }
+  function fbm(x, y, z, s) { var a = 0.5, f = 1, t = 0; for (var o = 0; o < 5; o++) { t += a * vnoise(x * f, y * f, z * f, s + o * 17); a *= 0.5; f *= 2.03; } return t; }
+
+  var C = {
+    deep: 0x5f8fc2, sea: 0x7fb0dd, shallow: 0x9fc8e8, sand: 0xf3e3b3, grass: 0xa8d8a0, grass2: 0x95cc8f, forest: 0x7dbb8a,
+    rock: 0xa49bb3, rock2: 0x8a84a0, snow: 0xf4f1ea, ice: 0xdcebf7, trunk: 0x8a6a5a,
+    leafs: [0xf19389, 0xf8d98c, 0xf2b277, 0xc3645c, 0xb8eac4], pine: 0x5f9c78,
+    pad: 0xb9c1dc, padLine: 0xf8d98c, tower: 0xf19389, white: 0xf1f3fb, roof: [0xf19389, 0x8bc0f2, 0xf8d98c], wall: 0xfcecc6, cloud: 0xf7f8fc,
+    moon: 0xc9c3d6, moonDark: 0xb6aeca, moonSea: 0xaba1c6, moonFloor: 0x8279a3, moonRim: 0xeeeaf6
+  };
+  var SKIES = {
+    night: { top: "#060914", mid: "#0a0f1f", low: "#172042", nebula: ["#ab86bf", "#5593c6", "#f19389"], stars: true, sun: 0xfff1d6, sunI: 2.3, hemiSky: 0x8bc0f2, hemiGround: 0x172042, hemiI: 1.05, fog: null },
+    dusk: { top: "#6f9fd8", mid: "#c5e0f9", low: "#f8c9c4", nebula: [], stars: false, sun: 0xffe6c4, sunI: 2.2, hemiSky: 0xc5e0f9, hemiGround: 0xf8c9c4, hemiI: 1.25, fog: null }
+  };
+  var SIZES = { chunky: 11, medium: 17, fine: 25 };
+
+  function skyTexture(sky) {
+    var w = 1024, h = 512, cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    var g = cv.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, sky.top); gr.addColorStop(0.55, sky.mid); gr.addColorStop(1, sky.low);
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    var r = rng(42);
+    sky.nebula.forEach(function (col, i) {
+      for (var k = 0; k < 5; k++) {
+        var x = (0.15 + 0.32 * i + r() * 0.2) * w, y = (0.3 + r() * 0.4) * h, rad = 60 + r() * 140;
+        var rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, col + "26"); rg.addColorStop(1, col + "00");
+        g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      }
+    });
+    if (sky.stars) {
+      for (var s = 0; s < 500; s++) { var sz = r() < 0.08 ? 2 : 1; g.fillStyle = "rgba(241,243,251," + (0.25 + r() * 0.6).toFixed(2) + ")"; g.fillRect(Math.floor(r() * w), Math.floor(r() * h), sz, sz); }
+    }
+    var t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+  }
+
+  // ---------- the voxel builder ----------
+  function Voxels() { this.map = new Map(); }
+  Voxels.prototype.key = function (x, y, z) { return x + "," + y + "," + z; };
+  Voxels.prototype.set = function (x, y, z, c) { this.map.set(this.key(x, y, z), [x, y, z, c]); };
+  Voxels.prototype.has = function (x, y, z) { return this.map.has(this.key(x, y, z)); };
+  Voxels.prototype.mesh = function (size, shade) {
+    var list = Array.from(this.map.values()), geo = new THREE.BoxGeometry(size, size, size);
+    var mat = new THREE.MeshLambertMaterial();
+    var m = new THREE.InstancedMesh(geo, mat, list.length), o = new THREE.Object3D(), col = new THREE.Color(), self = this;
+    list.forEach(function (v, i) {
+      o.position.set(v[0] * size, v[1] * size, v[2] * size); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
+      var open = 0; // simple baked occlusion: count open neighbours
+      [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].forEach(function (d) { if (!self.has(v[0]+d[0], v[1]+d[1], v[2]+d[2])) open++; });
+      var ao = shade ? 0.78 + 0.22 * Math.min(1, open / 3) : 1;
+      var j = 0.96 + hash3(v[0], v[1], v[2], 9) * 0.08;
+      col.setHex(v[3]); col.multiplyScalar(ao * j); m.setColorAt(i, col);
+    });
+    m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  };
+
+  function domAxis(x, y, z) { var ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z); if (ax >= ay && ax >= az) return [Math.sign(x), 0, 0]; if (ay >= az) return [0, Math.sign(y), 0]; return [0, 0, Math.sign(z)]; }
+
+  function buildPlanet(R, seed) {
+    var V = new Voxels(), r = rng(seed), maxH = Math.max(2, Math.round(R * 0.2)), surf = new Map(), lim = R + maxH + 1;
+    function height(dx, dy, dz) { var e = fbm(dx * 1.7 + 3, dy * 1.7, dz * 1.7, seed) * 1.35 + 0.05; return e; }
+    for (var x = -lim; x <= lim; x++) for (var y = -lim; y <= lim; y++) for (var z = -lim; z <= lim; z++) {
+      var d = Math.sqrt(x * x + y * y + z * z); if (d < R - 3 || d > lim) continue;
+      var dx = x / d, dy = y / d, dz = z / d, e = height(dx, dy, dz), land = e > 0;
+      var top = land ? R + Math.round(Math.pow(e, 1.25) * maxH * 1.6) : R;
+      if (d > top + 0.5 || d < top - 2.2) continue;
+      var lat = Math.abs(dy), c;
+      if (!land) c = e < -0.22 ? C.deep : (e < -0.08 ? C.sea : C.shallow);
+      else {
+        var hgt = top - R;
+        if (lat > 0.86 || hgt >= maxH * 1.35) c = lat > 0.86 ? C.ice : C.snow;
+        else if (hgt === 0) c = C.sand;
+        else if (hgt >= maxH * 0.95) c = (hash3(x, y, z, 3) > 0.5 ? C.rock : C.rock2);
+        else c = e > 0.18 ? C.forest : (hash3(x, y, z, 5) > 0.5 ? C.grass : C.grass2);
+        if (d < top - 0.5 && c !== C.snow && c !== C.ice) c = hgt > 1 ? C.rock2 : C.sand;
+      }
+      if (lat > 0.9 && !land) c = C.ice;
+      V.set(x, y, z, c);
+      if (d >= top - 0.5) surf.set(x + "," + y + "," + z, { x: x, y: y, z: z, land: land, h: top - R, lat: lat, e: e });
+    }
+    // features on the surface, standing along the local "up" axis
+    var spots = Array.from(surf.values()).filter(function (s) { return s.land && s.lat < 0.8 && s.h > 0 && s.h < maxH * 0.95; });
+    function stack(s, up, k, c) { V.set(s.x + up[0] * k, s.y + up[1] * k, s.z + up[2] * k, c); }
+    function blob(cx, cy, cz, up, rad, c) {
+      for (var a = -rad; a <= rad; a++) for (var b = -rad; b <= rad; b++) for (var h = 0; h <= rad; h++) {
+        if (a * a + b * b + h * h > rad * rad + 0.6) continue;
+        var p = up[0] ? [h * up[0], a, b] : up[1] ? [a, h * up[1], b] : [a, b, h * up[2]];
+        V.set(cx + p[0], cy + p[1], cz + p[2], c);
+      }
+    }
+    // launch pad + tower near the equator
+    var pad = spots.slice().sort(function (a, b) { return a.lat - b.lat || b.y - a.y; })[Math.floor(spots.length * 0.02)];
+    var padUp = null;
+    if (pad) {
+      padUp = domAxis(pad.x, pad.y, pad.z); var pr = Math.max(2, Math.round(R / 7));
+      for (var a = -pr; a <= pr; a++) for (var b = -pr; b <= pr; b++) {
+        var p = padUp[0] ? [0, a, b] : padUp[1] ? [a, 0, b] : [a, b, 0];
+        V.set(pad.x + p[0] + padUp[0], pad.y + p[1] + padUp[1], pad.z + p[2] + padUp[2], (a === 0 || b === 0) ? C.padLine : C.pad);
+      }
+      var th = Math.round(R * 0.45), off = padUp[0] ? [0, pr, 0] : padUp[1] ? [pr, 0, 0] : [pr, 0, 0];
+      for (var k = 2; k <= th; k++) V.set(pad.x + off[0] + padUp[0] * k, pad.y + off[1] + padUp[1] * k, pad.z + off[2] + padUp[2] * k, (k % 2) ? C.tower : C.white);
+    }
+    var used = new Set();
+    function far(s, gap) { var kk = Math.round(s.x / gap) + "," + Math.round(s.y / gap) + "," + Math.round(s.z / gap); if (used.has(kk)) return false; used.add(kk); return true; }
+    var gap = Math.max(3, Math.round(R / 4.5));
+    spots.forEach(function (s) {
+      if (pad && Math.abs(s.x - pad.x) + Math.abs(s.y - pad.y) + Math.abs(s.z - pad.z) < R / 2.2) return;
+      var up = domAxis(s.x, s.y, s.z), roll = r();
+      if (s.e > 0.14 && roll < 0.3 && far(s, gap)) {
+        var tall = 1 + Math.round(r() * Math.max(1, R / 9));
+        for (var k = 1; k <= tall; k++) stack(s, up, k, C.trunk);
+        if (r() < 0.35) { for (var k2 = tall + 1; k2 <= tall + 3; k2++) stack(s, up, k2, C.pine); }
+        else blob(s.x + up[0] * (tall + 1), s.y + up[1] * (tall + 1), s.z + up[2] * (tall + 1), up, Math.max(1, Math.round(R / 16)), C.leafs[Math.floor(r() * C.leafs.length)]);
+      } else if (roll > 0.985 && far(s, gap * 2)) {
+        for (var k3 = 1; k3 <= 2; k3++) stack(s, up, k3, C.wall);
+        stack(s, up, 3, C.roof[Math.floor(r() * 3)]);
+      }
+    });
+    return { vox: V, padUp: padUp, maxH: maxH };
+  }
+
+  // The moon: lavender rock with round craters (a dark floor, a pale raised rim) and a small outpost at its pole.
+  function buildMoon(R, seed) {
+    var V = new Voxels(), r = rng(seed), craters = [], n = R < 6 ? 3 : 6;
+    while (craters.length < n) {
+      var u = r() * 1.5 - 0.9, t = r() * Math.PI * 2, q = Math.sqrt(1 - u * u), c = [Math.cos(t) * q, u, Math.sin(t) * q, 0.24 + r() * 0.16];
+      if (craters.every(function (o) { return Math.acos(Math.max(-1, Math.min(1, o[0] * c[0] + o[1] * c[1] + o[2] * c[2]))) > (o[3] + c[3]) * 1.1; })) craters.push(c);
+      else if (r() < 0.02) n--;
+    }
+    var lim = R + 2;
+    for (var x = -lim; x <= lim; x++) for (var y = -lim; y <= lim; y++) for (var z = -lim; z <= lim; z++) {
+      var d = Math.sqrt(x * x + y * y + z * z); if (d < R - 2.6 || d < 0.01) continue;
+      var h = 0, kind = 0; // 1: a crater's floor, 2: its rim
+      for (var i = 0; i < craters.length; i++) {
+        var o = craters[i], k = Math.acos(Math.max(-1, Math.min(1, (x * o[0] + y * o[1] + z * o[2]) / d))) / o[3];
+        if (k < 0.7) { h = -1; kind = 1; break; }
+        if (k < 1.14) { h = R < 9 ? 0 : 1; kind = 2; }
+      }
+      if (d > R + h + 0.35) continue;
+      var top = d > R + h - 0.65, col = C.moon;
+      if (top && kind === 1) col = C.moonFloor;
+      else if (top && kind === 2) col = C.moonRim;
+      else if (vnoise(x * 0.35 + 9, y * 0.35, z * 0.35, seed) > 0.56) col = C.moonSea;
+      else if (hash3(x, y, z, seed) > 0.86) col = C.moonDark;
+      V.set(x, y, z, col);
+    }
+    // the outpost: a dome, a mast with a coral light, a flag, and a pad lamp
+    var dr = Math.max(1, Math.round(R * 0.26)), by = R + 1;
+    for (var dx = -dr; dx <= dr; dx++) for (var dy = 0; dy <= dr; dy++) for (var dz = -dr; dz <= dr; dz++) {
+      var dd = Math.sqrt(dx * dx + dy * dy + dz * dz); if (dd <= dr + 0.2) V.set(dx, by + dy, dz, dd > dr - 0.9 && (dx + dz + dy) % 3 === 0 ? C.white : 0x8bc0f2);
+    }
+    for (var bx = -dr - 2; bx <= dr + 2; bx++) for (var bz = -dr - 2; bz <= dr + 2; bz++) if (!V.has(bx, by - 1, bz) && bx * bx + bz * bz <= (dr + 2.3) * (dr + 2.3)) V.set(bx, by - 1, bz, C.moonRim);
+    var mx = dr + 1, mh = Math.max(2, dr + 2);
+    for (var m = 0; m < mh; m++) V.set(mx, by + m, -1, C.white);
+    V.set(mx, by + mh, -1, 0xf19389);
+    for (var f = 0; f < Math.max(2, dr + 1); f++) V.set(-mx, by + f, 1, C.white);
+    V.set(-mx - 1, by + Math.max(2, dr + 1) - 1, 1, 0xf8d98c); if (R >= 5) V.set(-mx - 2, by + dr, 1, 0xf8d98c);
+    return V;
+  }
+
+  // The other worlds of the system, each with a look of its own.
+  function shell(R, pick) {
+    var V = new Voxels();
+    for (var x = -R; x <= R; x++) for (var y = -R; y <= R; y++) for (var z = -R; z <= R; z++) {
+      var d = Math.sqrt(x * x + y * y + z * z); if (d > R + 0.3 || d < R - 1.6) continue;
+      V.set(x, y, z, pick(x, y, z, d));
+    }
+    return V;
+  }
+  var FAR = {
+    // a banded desert giant inside two rings
+    ringed: function (R, seed) {
+      var bands = [0xf19389, 0xf2b277, 0xf8d98c, 0xc3645c, 0xf2b277, 0xfcecc6, 0xf19389, 0xc3645c];
+      var V = shell(R, function (x, y, z) { var w = (vnoise(x * 0.3, y * 0.3, z * 0.3, seed) - 0.5) * 2.2; return bands[Math.floor(((y + w) / R * 0.5 + 0.5) * 9.99 + 16) % bands.length]; });
+      var out = Math.round(R * 2.15);
+      for (var x = -out; x <= out; x++) for (var z = -out; z <= out; z++) {
+        var d = Math.sqrt(x * x + z * z) / R; if (d < 1.42 || d > 2.15 || (d > 1.74 && d < 1.86)) continue;
+        if (hash3(x, 0, z, seed) > 0.9) continue;
+        V.set(x, 0, z, d < 1.74 ? (hash3(x, 1, z, seed) > 0.5 ? 0xfcecc6 : 0xf8d98c) : (hash3(x, 2, z, seed) > 0.5 ? 0xf2b277 : 0xf8d98c));
+      }
+      return V;
+    },
+    // an ice world: mint seas, pale floes, a white cap, and crystal spires
+    crystal: function (R, seed) {
+      var V = shell(R, function (x, y, z, d) {
+        if (Math.abs(y) > R * 0.8) return 0xf4f1ea;
+        var e = fbm(x / R * 1.5 + 2, y / R * 1.5, z / R * 1.5, seed);
+        return e > 0.6 ? 0xf4f1ea : e > 0.52 ? 0x8bc0f2 : e > 0.45 ? 0xdcebf7 : e > 0.36 ? 0xb8eac4 : 0x9fd4ae;
+      });
+      var r = rng(seed + 1);
+      for (var i = 0; i < 10; i++) { // a spire: a thick foot in ice blue that narrows to a white tip
+        var u = r() * 1.7 - 0.85, t = r() * Math.PI * 2, q = Math.sqrt(1 - u * u), n = [Math.cos(t) * q, u, Math.sin(t) * q], len = Math.round(R * (0.3 + r() * 0.45));
+        var ax = domAxis(n[0], n[1], n[2]), s1 = ax[0] ? [0, 1, 0] : [1, 0, 0], s2 = ax[2] ? [0, 1, 0] : [0, 0, 1];
+        for (var k = -1; k <= len; k++) {
+          var px = Math.round(n[0] * (R + k)), py = Math.round(n[1] * (R + k)), pz = Math.round(n[2] * (R + k)), f = k / len, c = f > 0.75 ? 0xf1f3fb : f > 0.4 ? 0xdcebf7 : 0x8bc0f2;
+          V.set(px, py, pz, c);
+          if (f < 0.6) [s1, s2].forEach(function (sd) { V.set(px + sd[0], py + sd[1], pz + sd[2], c); V.set(px - sd[0], py - sd[1], pz - sd[2], c); });
+          if (f < 0.25) { V.set(px + s1[0] + s2[0], py + s1[1] + s2[1], pz + s1[2] + s2[2], 0x8bc0f2); V.set(px - s1[0] - s2[0], py - s1[1] - s2[1], pz - s1[2] - s2[2], 0x8bc0f2); }
+        }
+      }
+      return V;
+    },
+    // a lilac gas giant with a great storm, and a small moon of its own
+    storm: function (R, seed, bare) {
+      var bands = [0x7d5a96, 0xab86bf, 0xc7a8d6, 0xab86bf, 0xe3d1ea, 0x9470ab, 0xc7a8d6, 0x7d5a96, 0xab86bf];
+      var V = shell(R, function (x, y, z, d) {
+        var ex = (Math.atan2(z, x) - 0.6) * R / 3.4, ey = (y - R * 0.28) / 1.9, e = ex * ex + ey * ey;
+        if (x * x + z * z > 1 && e < 0.45) return 0xf8d98c; if (e < 1) return 0xf19389; if (e < 1.7) return 0xe3d1ea;
+        var w = Math.sin(Math.atan2(z, x) * 3 + y * 0.8) * 0.9 + (vnoise(x * 0.25, y * 0.25, z * 0.25, seed) - 0.5) * 1.6;
+        return bands[Math.floor(((y + w) / R * 0.5 + 0.5) * 11.99 + 18) % bands.length];
+      });
+      var mr = Math.max(2, Math.round(R * 0.2)), off = Math.round(R * 1.75);
+      if (!bare) for (var x = -mr; x <= mr; x++) for (var y = -mr; y <= mr; y++) for (var z = -mr; z <= mr; z++) if (x * x + y * y + z * z <= mr * mr + 0.4) V.set(off + x, Math.round(R * 0.45) + y, z, hash3(x, y, z, seed) > 0.7 ? 0xb9c1dc : 0xf1f3fb);
+      return V;
+    }
+  };
+
+  function buildCloud(r) {
+    var V = new Voxels(), n = 3 + Math.floor(r() * 3);
+    for (var i = 0; i < n; i++) {
+      var cx = i * 2 - n, rad = 1.3 + r() * 1.3;
+      for (var x = -3; x <= 3; x++) for (var y = 0; y <= 3; y++) for (var z = -2; z <= 2; z++) if (x * x + y * y * 1.6 + z * z < rad * rad) V.set(cx + x, y, z, C.cloud);
+    }
+    return V;
+  }
+
+  // The rocket, in fine blocks, short and stout like a toy: a coral ogive nose with a cream tip and an antenna,
+  // a white hull with panel seams, a butter band and a coral stripe down two sides, a porthole on the other two,
+  // four swept fins, and a dark engine bell with a lit throat. +Y is the nose. 40 blocks tall, 11 across.
+  function buildRocket() {
+    var V = new Voxels(), rb = 5.3, x, y, h;
+    function disc(yy, r, col, inner) {
+      var m = Math.ceil(r);
+      for (var a = -m; a <= m; a++) for (var b = -m; b <= m; b++) { var d = Math.sqrt(a * a + b * b); if (d > r || (inner && d < inner)) continue; V.set(a, yy, b, typeof col === "function" ? col(a, b, d) : col); }
+    }
+    for (y = 0; y <= 18; y++) disc(y, rb, function (a, b) {
+      if (y >= 17) return 0xc3645c;                       // a deep coral collar under the nose
+      if (y === 4 || y === 5) return 0xf8d98c;            // the butter band
+      if (y <= 1) return 0x8e98ba;                        // a slate ring at the foot
+      if (Math.abs(b) <= 1 && Math.abs(a) === 5 && y >= 7 && y <= 15) return 0xf19389; // the stripe
+      return y % 6 === 3 ? 0xd9deee : 0xf1f3fb;           // a seam every few rows
+    });
+    for (y = 19; y <= 30; y++) { var f = (y - 18) / 12.6; disc(y, Math.max(0.6, rb * Math.sqrt(1 - Math.pow(f, 1.8))), y >= 28 ? 0xfcecc6 : (y === 23 ? 0xe07f75 : 0xf19389)); }
+    V.set(0, 31, 0, 0xfcecc6); V.set(0, 32, 0, 0xb9c1dc); V.set(0, 33, 0, 0xb9c1dc);
+    // portholes: sky glass with a glint, inside a raised slate rim
+    [1, -1].forEach(function (s) {
+      for (x = -3; x <= 3; x++) for (h = -3; h <= 3; h++) {
+        var d2 = x * x + h * h; if (d2 > 9) continue;
+        var zf = Math.floor(Math.sqrt(rb * rb - x * x)) * s;
+        if (d2 > 4) V.set(x, 11 + h, zf + s, 0x6f7aa6); else V.set(x, 11 + h, zf, (x === -1 * s && h === 1) ? 0xf1f3fb : (h < 0 ? 0x6ea6dc : 0x8bc0f2));
+      }
+    });
+    // fins: swept back past the foot, a darker edge, thicker at the root
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (u) {
+      for (y = -4; y <= 9; y++) {
+        var out = Math.min(12, Math.floor(5 + (9 - y) * 0.8)), inn = y < 0 ? Math.ceil(5 + (-y) * 1.4) : 5;
+        for (var r = inn; r <= out; r++) {
+          var c = (r === out || y === -4) ? 0xc3645c : 0xf19389;
+          V.set(u[0] * r, y, u[1] * r, c);
+          if (r <= 7 && y >= 0 && y <= 6) { V.set(u[0] * r + u[1], y, u[1] * r + u[0], c); V.set(u[0] * r - u[1], y, u[1] * r - u[0], c); }
+        }
+      }
+    });
+    // engine: a slate skirt, then a bell that opens downwards with a lit throat
+    disc(-1, 4.2, 0x8e98ba); disc(-2, 3.6, 0x6f7aa6);
+    for (y = -3; y >= -6; y--) { var br = 3 + (-3 - y) * 0.55; disc(y, br, 0x565f85, br - 1.3); }
+    disc(-3, 1.8, 0xf8d98c); disc(-4, 2.2, 0xfff1d6);
+    return V;
+  }
+
+  // ---------- a world: planet, moon, clouds, rocket, sky ----------
+  function World(canvas, opts) {
+    this.canvas = canvas; this.opts = opts; this.paused = false; this.t = 0;
+    var ren = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: !!opts.alpha, preserveDrawingBuffer: !!opts.alpha, powerPreference: "high-performance" });
+    ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.maxDpr || 2));
+    ren.outputColorSpace = THREE.SRGBColorSpace; ren.toneMapping = THREE.NoToneMapping;
+    ren.shadowMap.enabled = true; ren.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.ren = ren;
+    this.cam = new THREE.PerspectiveCamera(opts.fov || 38, 1, 0.1, 400);
+    this.az = opts.az || 0.6; this.el = opts.el || 0.32; this.dist = opts.dist || 26; this.drag = null;
+    this.build(opts.vox || "medium", opts.sky || "night");
+    var self = this;
+    canvas.addEventListener("pointerdown", function (e) { self.drag = { x: e.clientX, y: e.clientY, az: self.az, el: self.el }; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", function (e) { if (!self.drag) return; self.az = self.drag.az - (e.clientX - self.drag.x) * 0.006; self.el = Math.max(-0.6, Math.min(1.1, self.drag.el + (e.clientY - self.drag.y) * 0.004)); });
+    canvas.addEventListener("pointerup", function () { self.drag = null; });
+    canvas.addEventListener("pointercancel", function () { self.drag = null; });
+  }
+  World.prototype.build = function (vox, skyName) {
+    if (this.scene) this.scene.traverse(function (o) { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+    var sky = SKIES[skyName], R = SIZES[vox], size = 6 / R, scene = new THREE.Scene(), self = this;
+    this.scene = scene; this.voxSize = size;
+    scene.background = skyTexture(sky);
+    var skyMesh = null;
+    if (sky.stars) { // square stars in 3D, so they drift against the planet as the camera turns
+      var sr = rng(3), pts = new Float32Array(1500 * 3);
+      for (var si = 0; si < 1500; si++) { var u = sr() * 2 - 1, th0 = sr() * Math.PI * 2, rr0 = 120 + sr() * 60, q0 = Math.sqrt(1 - u * u); pts[si*3] = Math.cos(th0) * q0 * rr0; pts[si*3+1] = u * rr0; pts[si*3+2] = Math.sin(th0) * q0 * rr0; }
+      var sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(pts, 3));
+      skyMesh = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xf1f3fb, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0.8 }));
+      scene.add(skyMesh);
+    }
+    scene.add(new THREE.HemisphereLight(sky.hemiSky, sky.hemiGround, sky.hemiI));
+    var sun = new THREE.DirectionalLight(sky.sun, sky.sunI); sun.position.set(14, 12, 10); sun.castShadow = true;
+    var sm = this.opts.shadow || 2048; sun.shadow.mapSize.set(sm, sm); var sc = sun.shadow.camera; sc.left = sc.bottom = -13; sc.right = sc.top = 13; sc.near = 1; sc.far = 60;
+    sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02; sun.shadow.radius = 3; scene.add(sun);
+
+    var built = buildPlanet(R, 7);
+    this.planet = new THREE.Group(); this.planet.add(built.vox.mesh(size, true)); this.planet.rotation.z = 0.25; scene.add(this.planet);
+
+    var r = rng(11);
+    this.clouds = new THREE.Group(); this.planet.add(this.clouds);
+    var cloudR = 6 + built.maxH * size + 1.3;
+    for (var i = 0; i < 9; i++) {
+      var cm = buildCloud(r).mesh(size * 0.85, false); cm.castShadow = true; cm.receiveShadow = false;
+      var holder = new THREE.Group(), th = r() * Math.PI * 2, ph = (r() - 0.5) * 2.0;
+      cm.position.set(0, cloudR, 0); holder.add(cm); holder.rotation.set(ph, th, (r() - 0.5) * 1.4); this.clouds.add(holder);
+    }
+    var moonR = Math.max(5, Math.round(R * 0.5)); // finer blocks than the planet's, at the same size in the sky
+    if (this.opts.moonKind) { // the banner's companion: one of the system's worlds, tilted, spinning on its own axis
+      var gr = Math.max(12, moonR), body = FAR[this.opts.moonKind](gr, 23, true).mesh((this.opts.moonSize || 1.75) / gr, true);
+      this.moonSpin = body; this.moon = new THREE.Group(); this.moon.rotation.set(-0.3, 0, 0.2); this.moon.add(body);
+    } else { this.moon = buildMoon(moonR, 5).mesh(1.75 / moonR, true); this.moonSpin = this.moon; }
+    this.moonPivot = new THREE.Group(); this.moonPivot.rotation.z = this.opts.moonTilt === undefined ? -0.35 : this.opts.moonTilt; this.moonPivot.add(this.moon); this.moon.position.set(this.opts.moonR || 15, 0, 0); scene.add(this.moonPivot);
+
+    // a thin belt of drifting blocks
+    var belt = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial(), 170), o = new THREE.Object3D(), col = new THREE.Color();
+    var beltCols = [0xf8d98c, 0xf19389, 0xab86bf, 0x8bc0f2, 0xb9c1dc];
+    for (var b = 0; b < 170; b++) {
+      var a = r() * Math.PI * 2, rad = (this.opts.beltR || 10.5) + r() * (this.opts.beltW || 2.2), s = size * (0.4 + r() * 0.7);
+      o.position.set(Math.cos(a) * rad, (r() - 0.5) * 0.5, Math.sin(a) * rad); o.scale.setScalar(s); o.rotation.set(r() * 3, r() * 3, 0); o.updateMatrix();
+      belt.setMatrixAt(b, o.matrix); col.setHex(beltCols[Math.floor(r() * beltCols.length)]); belt.setColorAt(b, col);
+    }
+    belt.castShadow = true; belt.receiveShadow = true;
+    this.belt = new THREE.Group(); this.belt.add(belt); this.belt.rotation.set(0.42, 0, 0.18); scene.add(this.belt);
+
+    // the system's other worlds, far off: only where the visitor can look around
+    this.far = [];
+    if (!this.opts.solo) [["ringed", -100, -5, -23, 7, 10, [0.45, 0, 0.3]], ["crystal", -99, -30, -3, 5.5, 10, [0.2, 0, -0.25]], ["storm", -60, -21, -125, 10, 12, [-0.3, 0, 0.2]]].forEach(function (p, k) {
+      var m = FAR[p[0]](p[5], 21 + k).mesh(p[4] / p[5], true); m.castShadow = m.receiveShadow = false;
+      var g = new THREE.Group(); g.add(m); g.position.set(p[1], p[2], p[3]); g.rotation.set(p[6][0], p[6][1], p[6][2]); scene.add(g); self.far.push(m);
+    });
+
+    // rocket and its exhaust
+    this.rocket = new THREE.Group(); var rm = buildRocket().mesh(0.0765, true); rm.position.y = -1.03; rm.receiveShadow = false; this.rocket.add(rm);
+    // light the hull as the round thing it is: blocks this fine, each lit by its own flat faces, turn into stripes
+    rm.material.onBeforeCompile = function (sh) {
+      sh.vertexShader = sh.vertexShader.replace("#include <beginnormal_vertex>", "#include <beginnormal_vertex>\n#ifdef USE_INSTANCING\n  vec3 fromAxis = vec3(instanceMatrix[3].x, 0.0, instanceMatrix[3].z);\n  if (length(fromAxis) > 0.001) objectNormal = normalize(mix(objectNormal, normalize(fromAxis), 0.66));\n#endif");
+      // and let it carry some of its own light, so that its colours read on the side the sun misses
+      sh.fragmentShader = sh.fragmentShader.replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * 0.42;");
+    };
+    // the engine's flame: blocks that narrow away from the bell, round a pale core, and flicker
+    this.flame = new THREE.Group(); this.flame.position.y = -1.5; this.rocket.add(this.flame);
+    [[0.42, 0.4, 0, 0xf19389, 0.9], [0.3, 0.38, 0.34, 0xf2b277, 0.9], [0.17, 0.34, 0.66, 0xf8d98c, 0.85], [0.24, 0.46, 0, 0xfff6dc, 1], [0.12, 0.3, 0.42, 0xfff6dc, 0.9]].forEach(function (f) {
+      var fm = new THREE.Mesh(new THREE.BoxGeometry(f[0], f[1], f[0]), new THREE.MeshBasicMaterial({ color: f[3], transparent: true, opacity: f[4] }));
+      fm.position.y = -f[2] - f[1] / 2; self.flame.add(fm);
+    });
+    var rocketHolder = new THREE.Group(); rocketHolder.add(this.rocket); scene.add(rocketHolder); this.rocketHolder = rocketHolder;
+    this.puffs = []; var puffGeo = new THREE.BoxGeometry(0.17, 0.17, 0.17);
+    var puffCols = [0xfff1d6, 0xf8d98c, 0xf2b277, 0xf19389];
+    for (var p = 0; p < 130; p++) { var pm = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: puffCols[p % 4], transparent: true })); pm.visible = false; scene.add(pm); this.puffs.push({ m: pm, life: 0, v: new THREE.Vector3() }); }
+    this.puffI = 0; this.orbitR = 6 + built.maxH * size + (this.opts.orbitGap || 3.2); if (this.opts.rocketScale) this.rocket.scale.setScalar(this.opts.rocketScale);
+    this.skyMesh = skyMesh;
+  };
+  World.prototype.resize = function () {
+    var w = this.canvas.clientWidth, h = this.canvas.clientHeight; if (!w || !h) return;
+    if (this.canvas.width !== Math.round(w * this.ren.getPixelRatio()) || this.canvas.height !== Math.round(h * this.ren.getPixelRatio())) { this.ren.setSize(w, h, false); this.cam.aspect = w / h; this.cam.updateProjectionMatrix(); }
+  };
+  World.prototype.frame = function (dt) {
+    this.resize();
+    // on the launch's clock the scene keeps real time, however slowly it is drawn: the card below does
+    if (!this.paused) { if (this.clock != null) this.t = (performance.now() - this.clock) / 1000; else this.t += dt; }
+    var t = this.t;
+    this.planet.rotation.y = t * 0.06; this.clouds.rotation.y = t * 0.03; if (!this.opts.moonRide) this.moonPivot.rotation.y = t * 0.12; this.moonSpin.rotation.y = t * 0.2; this.belt.rotation.y = t * 0.02;
+    for (var fi = 0; fi < this.far.length; fi++) this.far[fi].rotation.y = t * (0.05 + fi * 0.015);
+    if (!this.drag && !this.paused && !reduce && !this.opts.still) this.az += dt * 0.025;
+    var c = this.opts.target || [0, 0, 0];
+    this.cam.position.set(c[0] + Math.sin(this.az) * Math.cos(this.el) * this.dist, c[1] + Math.sin(this.el) * this.dist, c[2] + Math.cos(this.az) * Math.cos(this.el) * this.dist);
+    this.cam.lookAt(c[0], c[1], c[2]);
+    if (this.opts.pan) this.cam.translateX(-this.opts.pan);
+    this.cam.updateMatrixWorld();
+    // rocket on a tilted orbit, nose along its path
+    var w = (this.opts.orbitW || 0.55) * (this.opts.orbitDir || 1), ph = this.opts.orbitPhase || 0, a = ph + t * w, R = this.orbitR, tilt = 0.5, rs = this.opts.rocketScale || 1, self = this;
+    var at = function (q) { return new THREE.Vector3(Math.cos(q) * R, 0, Math.sin(q) * R).applyAxisAngle(new THREE.Vector3(1, 0, 0), tilt).applyAxisAngle(new THREE.Vector3(0, 0, 1), -0.2); };
+    var fw = new THREE.Vector3(-Math.sin(this.az) * Math.cos(this.el), -Math.sin(this.el), -Math.cos(this.az) * Math.cos(this.el));
+    var rt = new THREE.Vector3().crossVectors(fw, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(rt, fw);
+    if (this.opts.orbitView) {
+      // keep the orbit open towards the camera, so the rocket goes round the planet and never across it
+      var ov = this.opts.orbitView, roll = this.opts.orbitRoll === undefined ? -0.16 : this.opts.orbitRoll, u = rt.clone().applyAxisAngle(fw, roll), v = up.clone().multiplyScalar(Math.sin(ov)).addScaledVector(fw, Math.cos(ov)).applyAxisAngle(fw, roll);
+      at = function (q) { return u.clone().multiplyScalar(Math.cos(q) * R).addScaledVector(v, Math.sin(q) * R); };
+    }
+    this.at = at;
+    var pos = at(a), dir = at(a + 0.05 * Math.sign(w)).sub(pos).normalize();
+    if (this.opts.moonRide) {
+      // the moon rides the rocket's own plane on a smaller circle, always on the far side of the planet from it:
+      // seen from anywhere the two paths are nested rings that never cross, and the two never come near each other
+      this.moonPivot.rotation.set(0, 0, 0); this.moon.position.copy(at(a + Math.PI)).multiplyScalar(this.opts.moonR / R);
+    }
+    // the arrival: the rocket comes up from under the frame (it was launched from the card below) and is
+    // steered onto the orbit, meeting it at the orbit's own speed and heading
+    var L = this.launch, away = false, burn = 1;
+    if (L && t < L.join) {
+      if (t < L.enter) away = true;
+      else {
+        var aj = ph + L.join * w, pj = at(aj), vj = at(aj + 0.01 * Math.sign(w)).sub(pj).multiplyScalar(Math.abs(w) / 0.01);
+        var n = pj.clone().project(this.cam), p0 = new THREE.Vector3(L.x * 2 - 1, -1 - 2 * L.below, n.z).unproject(this.cam);
+        var perUnit = pj.clone().add(rt).project(this.cam).x - n.x; // how much of the view one unit covers at that depth
+        var v0 = up.clone().multiplyScalar(Math.cos(L.lean)).addScaledVector(rt, Math.sin(L.lean)).multiplyScalar(L.v * 2 / perUnit);
+        var dur = L.join - L.enter, s = (t - L.enter) / dur, k = dur / 3, m = 1 - s;
+        var p1 = p0.clone().addScaledVector(v0, k), p2 = pj.clone().addScaledVector(vj, -k);
+        pos = p0.clone().multiplyScalar(m * m * m).addScaledVector(p1, 3 * m * m * s).addScaledVector(p2, 3 * m * s * s).addScaledVector(pj, s * s * s);
+        dir = p1.clone().sub(p0).multiplyScalar(m * m).addScaledVector(p2.clone().sub(p1), 2 * m * s).addScaledVector(pj.clone().sub(p2), s * s).normalize();
+        burn = 1.6 - 0.6 * s;
+      }
+    }
+    this.rocketHolder.visible = !away;
+    this.rocketHolder.position.copy(pos);
+    this.rocketHolder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    this.rocket.rotation.y = t * (this.opts.rocketSpin || 0.7);
+    this.flame.scale.set(0.92 + 0.14 * Math.sin(t * 31), (0.8 + 0.3 * Math.abs(Math.sin(t * 23)) + 0.15 * Math.sin(t * 37)) * burn, 0.92 + 0.14 * Math.cos(t * 27));
+    if (!this.paused) {
+      for (var k2 = 0; k2 < (away ? 0 : 3); k2++) {
+        var p = this.puffs[this.puffI++ % this.puffs.length];
+        p.life = 1; p.m.visible = true; p.m.position.copy(pos).addScaledVector(dir, -1.9 * rs).add(new THREE.Vector3((Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.14));
+        p.v.copy(dir).multiplyScalar(-(0.9 + Math.random() * 0.7) * burn);
+      }
+      for (var i = 0; i < this.puffs.length; i++) {
+        var q = this.puffs[i]; if (q.life <= 0) continue; q.life -= dt * 1.5;
+        if (q.life <= 0) { q.m.visible = false; continue; }
+        q.m.position.addScaledVector(q.v, dt); q.m.scale.setScalar((0.5 + (1 - q.life) * 1.9) * rs); q.m.material.opacity = q.life;
+      }
+    }
+    this.ren.render(this.scene, this.cam);
+  };
+
+
+  // The banner's framing. ORBIT_W is the orbit's speed in radians a second; the rocket turns on its own axis
+  // twice an orbit, so that one orbit is a loop.
+  var ORBIT_W = 0.45;
+  window.THREE_ = THREE;
+  window.ORBIT_W = ORBIT_W;
+  window.banner = new World(document.getElementById("c-banner"), {
+    vox: "fine", sky: "night", dist: 52, el: 0.2, az: 2.2, shadow: 2048, maxDpr: 2, pan: 13.5, fov: 22,
+    orbitGap: 8.8, rocketScale: 1.75, orbitView: 0.33, orbitRoll: -0.1, solo: true,
+    moonR: 12.4, moonRide: true, moonKind: "storm", moonSize: 2.1,
+    orbitW: ORBIT_W, orbitDir: -1, orbitPhase: 0, rocketSpin: 2 * ORBIT_W,
+    beltR: 9.4, beltW: 1.5, alpha: true, still: true
+  });
+  window.banner.paused = true;
+})();
+</script>
+</body>
+</html>

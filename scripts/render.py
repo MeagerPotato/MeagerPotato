@@ -6,21 +6,29 @@ Writes the SVG cards into profile/ and rebuilds README.md from
 profile/README.template.md. Everything is plain SVG with CSS animation, because
 GitHub shows README images as <img> and runs no JavaScript inside them.
 
+The banner (profile/hero.svg) is put together here from the layers in profile/banner/,
+which scripts/banner/capture.js renders from a 3D scene: see scripts/banner/README.md.
+
     python scripts/render.py
+    python scripts/render.py --print-launch   # where and when the rocket leaves the streak card, as JSON
 """
 import base64
+import math
+import re
 import datetime
 import html
 import json
 import os
 import random
+import sys
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(HERE, "..")
 DATA = os.path.join(ROOT, "data")
 OUT = os.path.join(ROOT, "profile")
+BANNER = os.path.join(OUT, "banner")
+FONTS = os.path.join(HERE, "fonts")
 
-# GitHub's calendar dates are UTC, so the "synced" date uses UTC too and the two always agree
-TZ = datetime.timezone.utc
 
 W = 880
 # The palette is allenkh.com's (src/universe/design/tokens.ts), so the profile and the site read as one thing
@@ -42,17 +50,22 @@ LANG = {"TypeScript": "#3178c6", "JavaScript": "#f1e05a", "Python": "#3572a5", "
         "C": "#555555", "Rust": "#dea584", "Go": "#00add8", "Java": "#b07219", "HTML": "#e34c26",
         "CSS": "#663399", "Jupyter Notebook": "#da5b0b", "MATLAB": "#e16737", "Swift": "#f05138"}
 
-MONO = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
-SANS = "Outfit,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
-
-# Outfit, the site's typeface, travels inside every card: an <img> may not fetch a font, but it may carry one.
-# Where a browser refuses even that, the system sans above takes over.
-FONTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
-with open(os.path.join(FONTS, "outfit-latin.woff2"), "rb") as _f:
-    FONT_FACE = ("@font-face{font-family:Outfit;font-weight:100 900;src:url(data:font/woff2;base64,"
+# One blocky face for everything: Jersey 25, the finest grid of its family, so small text stays easy to read.
+# It travels inside every card: an <img> may not fetch a font, but it may carry one. Where a browser refuses
+# even that, the system sans takes over.
+SANS = "'Jersey 25',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+MONO = SANS
+with open(os.path.join(FONTS, "jersey25-latin.woff2"), "rb") as _f:
+    FONT_FACE = ("@font-face{font-family:'Jersey 25';src:url(data:font/woff2;base64,"
                  + base64.b64encode(_f.read()).decode() + ") format('woff2')}")
-with open(os.path.join(FONTS, "outfit-widths.json")) as _f:
-    ADVANCE = json.load(_f)  # advance widths per em, at weights 400 and 700
+with open(os.path.join(FONTS, "jersey25-widths.json")) as _f:
+    ADVANCE = json.load(_f)  # advance widths per em
+SMALL = 1.22  # Jersey is narrow and low: text under 16 px is set this much larger
+
+
+def px(size):
+    """The cards are laid out in the sizes of an ordinary sans; this is the size Jersey is set at to fill them."""
+    return size * SMALL if size < 16 else size * 1.08
 
 
 # ---------------------------------------------------------------- helpers
@@ -75,10 +88,7 @@ def mdy(date):
 
 def width(text, size, mono=False, bold=False):
     """Rendered width, so text can be wrapped and trimmed without a browser."""
-    if mono:
-        return len(text) * size * 0.6
-    table = ADVANCE["700" if bold else "400"]
-    return sum(size * table.get(c, 0.62) for c in text)
+    return sum(px(size) * ADVANCE.get(c, 0.5) for c in text)
 
 
 def clip(text, size, max_w, mono=False):
@@ -107,6 +117,8 @@ def wrap(text, size, max_w, max_lines):
 
 
 def svg(h, body, style="", w=W):
+    body = re.sub(r'font-size="([0-9.]+)"', lambda m: f'font-size="{px(float(m.group(1))):.1f}"', body)
+    body = body.replace('font-weight="700"', 'font-weight="400"').replace('font-weight="600"', 'font-weight="400"')
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
         f'font-family="{SANS}">\n<style>{FONT_FACE}{style}'
@@ -126,7 +138,7 @@ def block(x, y, w, h, rx=10, fill=PANEL):
 
 
 def label(x, y, text, color=BUTTER, anchor="start"):
-    return (f'<text x="{x}" y="{y}" font-family="{MONO}" font-size="11.5" font-weight="600" letter-spacing="2" '
+    return (f'<text x="{x}" y="{y}" font-family="{MONO}" font-size="11.5" font-weight="600" letter-spacing="1.5" '
             f'fill="{color}" text-anchor="{anchor}">{esc(text)}</text>')
 
 
@@ -195,79 +207,339 @@ def stats(days):
 
 # ---------------------------------------------------------------- cards
 
-def hero(st, synced):
-    h = 230
-    rnd = random.Random(7)  # fixed seed so the stars don't move between runs
-    stars = []
-    for n in range(90):
-        x, y = rnd.uniform(14, W - 14), rnd.uniform(14, h - 14)
-        if x < 470 and 30 < y < 215 and n % 3:
-            continue  # keep the area behind the name mostly clear
-        r = rnd.choice([0.6, 0.8, 0.8, 1.0, 1.3])
-        o = rnd.uniform(0.25, 0.8)
-        tw = f' class="tw" style="animation-delay:{rnd.uniform(0, 4):.2f}s"' if n % 4 == 0 else ""
-        stars.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{INK}" opacity="{o:.2f}"{tw}/>')
+def _layer(name):
+    with open(os.path.join(BANNER, name), "rb") as f:
+        return "data:image/webp;base64," + base64.b64encode(f.read()).decode()
 
-    cx, cy = 690, 116
-    orbit = (f'M {cx-150} {cy} A 150 46 0 1 1 {cx+150} {cy} A 150 46 0 1 1 {cx-150} {cy}')
-    chips, x = [], 40
+
+def hero(st):
+    """The banner: a voxel planet, the purple world that circles it, and the rocket. It is a stack of pictures
+    rendered once from the 3D scene (scripts/banner/), moved here by CSS alone:
+
+      the sky / whatever is behind the planet / the planet / whatever is in front of it / the words
+
+    The purple world is one picture that slides round its orbit. The rocket is a strip of pictures, one for each
+    step of its orbit, shown in turn while the strip slides along the same path, so it turns as it goes round.
+    Which of the two stacks a thing is in (behind the planet or in front of it) changes at the sides of its orbit,
+    where it is clear of the planet.
+
+    The page opens without the rocket. The streak card under this one launches it, and it comes up through the
+    bottom edge here at the moment and place it left that card (LAUNCH), flies a short arc and takes its place in
+    orbit. Two pictures cannot talk to each other on GitHub: they share nothing but the moment the page loaded.
+    With no streak there is no launch, and no rocket here."""
+    h = 260
+    with open(os.path.join(BANNER, "banner.json")) as f:
+        B = json.load(f)
+    P, T = B["period"], B["launch"]
+    live = st["current"] > 0
+    if live and any(abs(LAUNCH[k] - T[k]) > 0.002 for k in ("enter", "x", "below", "lean", "v")):
+        print("warning: the streak card now launches the rocket somewhere else than the banner catches it.\n"
+              "         Render the banner again: node scripts/banner/capture.js", file=sys.stderr)
+
+    def keys(rows, fmt):
+        n = len(rows)
+        return "".join(f"{k * 100 / n:.3f}%{{{fmt(rows[k % n])}}}" for k in range(n + 1))
+
+    def flips(flags, on, off):
+        """Keyframes that switch a stack on for the part of the loop where its flag holds."""
+        n, out, last = len(flags), [], None
+        for k, f in enumerate(flags):
+            if f != last:
+                out.append(f"{k * 100 / n:.3f}%{{visibility:{on if f else off}}}")
+                last = f
+        return "".join(out) + f"100%{{visibility:{on if flags[0] else off}}}"
+
+    css = [FONT_FACE]
+    back, front, late = [], [], ""
+
+    # ---- the purple world
+    m = B["moon"]
+    mk = m["keys"]  # x, y, scale, in front?
+    rest = B["rest"]  # the moment shown to someone who has asked for no motion
+    mr = mk[round(rest * len(mk)) % len(mk)]
+    moon = f'<g class="moon" transform="translate({mr[0]} {mr[1]}) scale({mr[2]})"><use href="#moon"/></g>'
+    back.append(f'<g class="mb" visibility="{"hidden" if mr[3] else "visible"}">{moon}</g>')
+    front.append(f'<g class="mf" visibility="{"visible" if mr[3] else "hidden"}">{moon}</g>')
+    css.append(f".moon{{animation:moon {P}s linear infinite}}"
+               f"@keyframes moon{{{keys(mk, lambda r: f'transform:translate({r[0]}px,{r[1]}px) scale({r[2]})')}}}"
+               f".mf{{animation:mf {P}s steps(1) infinite}}@keyframes mf{{{flips([r[3] for r in mk], 'visible', 'hidden')}}}"
+               f".mb{{animation:mb {P}s steps(1) infinite}}@keyframes mb{{{flips([not r[3] for r in mk], 'visible', 'hidden')}}}")
+
+    # ---- the rocket
+    if live:
+        o = B["orbit"]
+        n = len(o["frames"])
+        step = P / n
+        ri = round(rest * n) % n
+        pr = o["path"][round(rest * len(o["path"])) % len(o["path"])]
+        stacks = {True: [], False: []}
+        for k, fr in enumerate(o["frames"]):
+            stacks[fr["front"]].append(
+                f'<image class="f{" rest" if k == ri else ""}" x="{fr["dx"]}" y="{fr["dy"]}" width="{fr["w"]}" height="{fr["h"]}" '
+                f'href="{_layer(fr["file"])}" style="animation-delay:{(k - 0.5) * step - P:.3f}s"/>')
+        for flag, stack in ((False, back), (True, front)):
+            stack.append(f'<g class="late"><g class="orb" transform="translate({pr[0]} {pr[1]})">{"".join(stacks[flag])}</g></g>')
+        a = B["arrive"]
+        slot = 1 / a["fps"]
+        late = '<g class="arr">' + "".join(
+            f'<image class="a" x="{fr["x"]}" y="{fr["y"]}" width="{fr["w"]}" height="{fr["h"]}" href="{_layer(fr["file"])}" '
+            f'style="animation-delay:{T["enter"] + k * slot:.3f}s"/>' for k, fr in enumerate(a["frames"])) + "</g>"
+        css.append(
+            f".orb{{animation:orb {P}s linear infinite}}@keyframes orb{{{keys(o['path'], lambda r: f'transform:translate({r[0]}px,{r[1]}px)')}}}"
+            f".f{{opacity:0;animation:f {P}s steps(1) infinite}}@keyframes f{{0%{{opacity:1}}{100 / n:.4f}%,100%{{opacity:0}}}}"
+            f".late{{visibility:hidden;animation:show 1ms linear {T['join']}s forwards}}@keyframes show{{to{{visibility:visible}}}}"
+            f".arr{{visibility:hidden;animation:arr {len(a['frames']) * slot:.3f}s linear {T['enter']}s}}@keyframes arr{{from,to{{visibility:visible}}}}"
+            f".a{{opacity:0;animation:on {slot:.4f}s steps(1)}}@keyframes on{{from,to{{opacity:1}}}}")
+
+    # ---- the words: who, what, and the three addresses as tags
+    tags, x = [], 39.6
     for _, _, text, color in LINKS:
-        cw = round(width(text, 13) + 44)
-        chips.append(block(x, 158, cw, 28, rx=8)
-                     + f'<rect x="{x + 10}" y="167" width="10" height="10" rx="2.5" fill="{color}"/>'
-                     + f'<text x="{x + 28}" y="177" font-size="13" font-weight="600" fill="{INK}">{esc(text)}</text>')
-        x += cw + 10
+        tw = 15.4 * sum(ADVANCE.get(c, 0.5) for c in text)
+        bw = round(tw + 9.7 + 6.2 + 2 * 9.7 + 2, 1)
+        tags.append(f'<rect x="{x}" y="184.6" width="{bw}" height="27" rx="7" fill="{DEEP}"/>'
+                    f'<rect x="{x}" y="182" width="{bw}" height="27" rx="7" fill="{PANEL}" stroke="{LINE}" stroke-width="1.8"/>'
+                    f'<rect x="{x + 10.6:.1f}" y="190.6" width="9.7" height="9.7" rx="2.2" fill="{color}"/>'
+                    f'<text x="{x + 26.5:.1f}" y="200.6" font-size="15.4" fill="{INK}">{esc(text)}</text>')
+        x += bw + 7.9
+    words = ('<g class="in">'
+             f'<text x="39.6" y="65" font-size="15.4" letter-spacing="3.1" fill="{CORAL}">// MEAGERPOTATO</text>'
+             f'<text x="39.6" y="125" font-size="58" letter-spacing="0.6" fill="{DEEP}">Allen Hsieh</text>'
+             f'<text x="39.6" y="122" font-size="58" letter-spacing="0.6" fill="{INK}">Allen Hsieh</text>'
+             f'<text x="39.6" y="160" font-size="21" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>'
+             + "".join(tags) + "</g>")
+    css.append(".in{animation:in .8s ease-out both}@keyframes in{from{opacity:0;transform:translateY(8px)}}"
+               "@media (prefers-reduced-motion: reduce){*{animation:none!important}.f{display:none}"
+               ".f.rest{display:inline;opacity:1}.late{visibility:visible}}")
 
-    status = f"{st['total']:,} contributions this year · synced {mdy(synced)}"
-    body = f'''
-<defs>
-  <radialGradient id="glow" cx="{cx}" cy="{cy}" r="260" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="{LILAC}" stop-opacity="0.22"/><stop offset="1" stop-color="{CORAL}" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="planet" cx="0.35" cy="0.3" r="0.8">
-    <stop offset="0" stop-color="{BUTTER}"/><stop offset="0.55" stop-color="{CORAL}"/><stop offset="1" stop-color="#c3645c"/>
-  </radialGradient>
-  <clipPath id="card"><rect x="1" y="1" width="{W-2}" height="{h-2}" rx="13"/></clipPath>
-</defs>
-{frame(h)}
-<g clip-path="url(#card)">
-  <rect width="{W}" height="{h}" fill="url(#glow)"/>
-  {''.join(stars)}
-  <g transform="rotate(-14 {cx} {cy})">
-    <path d="{orbit}" fill="none" stroke="{DIM}" stroke-width="1" stroke-dasharray="3 6" opacity="0.8"/>
-    <circle cx="{cx}" cy="{cy}" r="30" fill="url(#planet)"/>
-    <path d="M {cx-150} {cy} A 150 46 0 0 0 {cx+150} {cy}" fill="none" stroke="{CORAL}" stroke-width="1.2" opacity="0.35"/>
-    <circle r="4.5" fill="{BUTTER}"><animateMotion dur="14s" repeatCount="indefinite" path="{orbit}"/></circle>
-    <circle r="10" fill="{BUTTER}" opacity="0.18"><animateMotion dur="14s" repeatCount="indefinite" path="{orbit}"/></circle>
-  </g>
-</g>
-<g class="in">
-  {label(40, 48, "// MEAGERPOTATO", CORAL)}
-  <text x="38" y="98" font-size="46" font-weight="700" fill="{INK}" letter-spacing="-0.5">Allen Hsieh</text>
-  <text x="40" y="128" font-size="17" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>
-  {''.join(chips)}
-  <circle class="pulse" cx="45" cy="210" r="3.5" fill="{MINT}"/>
-  <text x="56" y="214" font-family="{MONO}" font-size="12" fill="{DIM}">{esc(status)}</text>
-</g>'''
-    style = (".tw{animation:tw 4s ease-in-out infinite}@keyframes tw{50%{opacity:.1}}"
-             ".pulse{animation:pulse 2.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.25}}"
-             ".in{animation:in .8s ease-out both}@keyframes in{from{opacity:0;transform:translateY(8px)}}")
-    return svg(h, body, style)
+    p = B["planet"]
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" font-family="{SANS}">\n'
+        f'<style>{"".join(css)}</style>\n'
+        f'<defs><clipPath id="card"><rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14"/></clipPath>'
+        f'<image id="moon" x="{-m["w"] / 2}" y="{-m["h"] / 2}" width="{m["w"]}" height="{m["h"]}" href="{_layer(m["file"])}"/></defs>\n'
+        f'<rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14" fill="{DEEP}"/>\n'
+        '<g clip-path="url(#card)">\n'
+        f'<image width="{W}" height="{h}" href="{_layer(B["sky"])}"/>\n'
+        + "\n".join(back)
+        + f'\n<image x="{p["x"]}" y="{p["y"]}" width="{p["w"]}" height="{p["h"]}" href="{_layer(p["file"])}"/>\n'
+        + "\n".join(front) + "\n" + late + "\n" + words
+        + f'\n</g>\n<rect x="1" y="1" width="{W - 2}" height="{h - 2}" rx="14" fill="none" stroke="{LINE}" stroke-width="2"/>\n</svg>\n')
+
+
+LAUNCH = {}  # what the banner above has to know to catch the rocket: filled in by streak()
+
+
+def _flame(rows, cell, up=True):
+    """A flame in blocks. rows: one list per colour (outer first), each a list of (width, shift) from the base to
+    the tip, in cells. The base sits on y = 0."""
+    cols = [CORAL, BUTTER, "#fff6dc"]
+    out = []
+    for n, layer in enumerate(rows):
+        for k, (wd, sh) in enumerate(layer):
+            y = -(k + 1) * cell if up else k * cell
+            out.append(f'<rect x="{(sh - wd / 2) * cell / 4:.1f}" y="{y:.1f}" width="{wd * cell / 4:.1f}" height="{cell + 0.4:.1f}" fill="{cols[n]}"/>')
+    return "".join(out)
+
+
+FLAMES = [  # three drawings of one flame, shown in turn
+    [[(12, 0), (16, 0), (14, 0), (10, 1), (6, 2), (3, 3)], [(8, 0), (10, 0), (8, 0), (4, 1), (2, 2)], [(4, 0), (5, 0), (3, 0)]],
+    [[(12, 0), (16, -1), (14, -1), (10, -2), (6, -2), (3, -4)], [(8, 0), (10, -1), (8, -1), (4, -2)], [(4, 0), (5, 0), (2, -1)]],
+    [[(12, 0), (14, 1), (14, 0), (9, -1), (6, 1), (4, 2), (2, 3)], [(8, 0), (9, 0), (8, 0), (5, 0), (2, 1)], [(4, 0), (4, 0), (3, 0), (2, 0)]],
+]
+
+
+def _rocket(u=1.8):
+    """The banner's rocket seen from the side: the same parts in the same colours, a block of the model to
+    u here. Centre at 0,0, nose up. Returns (art, the nozzle's y)."""
+    mid = 13.5
+
+    def Y(v):
+        return (mid - v) * u
+
+    def R(x0, v_top, x1, v_bot, fill, extra=""):
+        return f'<rect x="{x0 * u:.2f}" y="{Y(v_top):.2f}" width="{(x1 - x0) * u:.2f}" height="{(v_top - v_bot) * u:.2f}" fill="{fill}"{extra}/>'
+
+    def P(pts, fill):
+        return '<polygon points="' + " ".join(f"{x * u:.2f},{Y(v):.2f}" for x, v in pts) + f'" fill="{fill}"/>'
+
+    o = []
+    for s in (-1, 1):  # the two fins seen flat on
+        o.append(P([(s * 5, 9.5), (s * 12.5, 0.2), (s * 12.5, -4.5), (s * 10.6, -4.5), (s * 5, -0.5)], CORAL))
+        o.append(P([(s * 11.2, 1.8), (s * 12.5, 0.2), (s * 12.5, -4.5), (s * 10.6, -4.5), (s * 10.2, -4.2), (s * 11.2, -3.6)], "#c3645c"))
+    o.append(R(-4.2, -0.5, 4.2, -1.5, "#8e98ba") + R(-3.6, -1.5, 3.6, -2.5, "#6f7aa6"))
+    o.append(P([(-3, -2.5), (3, -2.5), (4.7, -6.5), (-4.7, -6.5)], "#565f85"))
+    o.append(R(-2.6, -5.3, 2.6, -6.5, BUTTER))
+    o.append(R(-5.5, 18.5, 5.5, -0.5, "#f1f3fb"))
+    for v in (3, 9, 15):
+        o.append(R(-5.5, v + 0.5, 5.5, v - 0.5, "#d9deee"))
+    o.append(R(-5.5, 1.5, 5.5, -0.5, "#8e98ba") + R(-5.5, 5.5, 5.5, 3.5, BUTTER) + R(-5.5, 18.5, 5.5, 16.5, "#c3645c"))
+    for v in range(19, 31):
+        f = (v - 18) / 12.6
+        hw = math.floor(max(0.6, 5.3 * math.sqrt(1 - f ** 1.8))) + 0.5
+        o.append(R(-hw, v + 0.5, hw, v - 0.5, "#fcecc6" if v >= 28 else CORAL))
+    o.append(R(-0.5, 31.5, 0.5, 30.5, "#fcecc6") + R(-0.4, 33.5, 0.4, 31.5, "#b9c1dc"))
+    o.append(R(2.5, 30.5, 5.5, -0.5, DEEP, ' opacity="0.13"'))  # the side away from the light
+    o.append(R(-0.45, 8.5, 0.45, -4.5, "#e07f75"))             # the fin that faces us, edge on
+    o.append(f'<circle cx="0" cy="{Y(11):.2f}" r="{3.3 * u:.2f}" fill="#6f7aa6"/><circle cx="0" cy="{Y(11):.2f}" r="{2.2 * u:.2f}" fill="{SKY}"/>'
+             f'<rect x="{-1.5 * u:.2f}" y="{Y(12.4):.2f}" width="{1.2 * u:.2f}" height="{1.2 * u:.2f}" fill="#f1f3fb"/>')
+    return "".join(o), Y(-6.5)
+
+
+def _walk(points):
+    """A polyline's running length."""
+    acc = [0.0]
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        acc.append(acc[-1] + math.hypot(x1 - x0, y1 - y0))
+    return acc
+
+
+def _cubic(p0, p1, p2, p3, n=120):
+    out = []
+    for k in range(1, n + 1):
+        s = k / n
+        m = 1 - s
+        out.append((m ** 3 * p0[0] + 3 * m * m * s * p1[0] + 3 * m * s * s * p2[0] + s ** 3 * p3[0],
+                    m ** 3 * p0[1] + 3 * m * m * s * p1[1] + 3 * m * s * s * p2[1] + s ** 3 * p3[1]))
+    return out
 
 
 def streak(st):
+    """The streak as a fuse. It is coiled round the number and ends under a rocket: the flame burns round it while
+    the number counts up to the streak, and when it gets there the rocket lifts off and leaves by the top of the
+    card, for the banner above to catch (LAUNCH says where and when). With no streak the fuse stays unlit and the
+    rocket stays on its pad."""
     h = 280
-    # ring: how far the current streak is toward the longest one
-    rcx, rcy, r = 160, 140, 84
-    circ = 2 * 3.14159265 * r
-    frac = min(1.0, st["current"] / st["longest"]) if st["longest"] else 0
-    arc = circ * frac
-    if st["current"]:
+    cx, cy, r = 140, 146, 84
+    a0, sweep = 45.0, 315.0  # the fuse starts lower right and coils clockwise, all the way round to the right
+    live = st["current"] > 0
+    record = live and st["current"] >= st["longest"]
+
+    def pt(deg, rad=r):
+        return cx + rad * math.cos(math.radians(deg)), cy + rad * math.sin(math.radians(deg))
+
+    # ---- the rocket on its pad, and the way it flies
+    rx, ry = 287, 202
+    art, noz = _rocket()
+    c1 = ((rx, ry - 22), (rx, ry - 70), (rx + 46, ry - 96), (rx + 78, ry - 134))  # it leans out over the tiles,
+    c2 = (c1[3], (rx + 98, ry - 158), (rx + 110, ry - 192), (rx + 116, ry - 300))  # then straightens for the banner
+    fly_d = (f"M {rx} {ry} L {rx} {ry - 22} C " + " ".join(f"{x} {y}" for x, y in c1[1:]) + " C " + " ".join(f"{x} {y}" for x, y in c2[1:]))
+    line = [(rx, ry), (rx, ry - 22)] + _cubic(*c1) + _cubic(*c2)
+    run = _walk(line)
+    fly_len = run[-1]
+
+    def along(dist):
+        """Where the rocket is once it has flown this far, and which way it points (dx, dy)."""
+        dist = max(0.0, min(fly_len - 1e-6, dist))
+        k = next(i for i in range(1, len(run)) if run[i] >= dist)
+        (x0, y0), (x1, y1) = line[k - 1], line[k]
+        f = (dist - run[k - 1]) / (run[k] - run[k - 1])
+        return x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, x1 - x0, y1 - y0
+
+    # ---- the fuse: the coil, then a tail down to the engine
+    (sx, sy), (ex, ey) = pt(a0), pt(a0 + sweep)
+    tail = ((ex, ey), (ex, ey + 44), (ex + 2, ry + noz - 3), (rx - 7, ry + noz - 3))
+    fuse_d = (f"M {sx:.1f} {sy:.1f} A {r} {r} 0 1 1 {ex:.1f} {ey:.1f} C " + " ".join(f"{x:.1f} {y:.1f}" for x, y in tail[1:]))
+    length = 2 * math.pi * r * sweep / 360 + _walk([tail[0]] + _cubic(*tail))[-1]
+    seg = length / round(length / 10.6)  # cut into blocks
+
+    # ---- the clock
+    t0, burn = 0.45, 3.0           # the flame lights, and how long it takes to reach the engine
+    end = t0 + burn
+    lift = end + 0.5               # the engine runs for a moment first
+    T, power = 2.0, 1.7            # the climb out of the card: distance goes as time to this power
+    exit_y = 10                    # the banner takes over when the rocket's middle is this far under the top edge
+    g = next(d for d in (k * fly_len / 4000 for k in range(4001)) if along(d)[1] <= exit_y) / fly_len
+    hx, hy, hdx, hdy = along(g * fly_len)
+    tg = g ** (1 / power)
+    LAUNCH.clear()
+    LAUNCH.update({
+        "active": live,
+        "enter": round(lift + T * tg, 3),                       # seconds after the card starts
+        "x": round(hx / W, 4),                                  # where along the banner's width
+        "below": round((exit_y + 15) / 260, 4),                 # how far under the banner's edge, in its heights (15: the gap)
+        "lean": round(math.atan2(hdx, -hdy), 4),                # heading, clockwise from straight up
+        "v": round(fly_len * power * tg ** (power - 1) / T / W, 4),  # speed, in banner widths a second
+    })
+
+    if live:
         hint = f"since {md(d(st['current_start']))}"
     elif st["last_active"]:
         hint = f"last active {md(d(st['last_active']))}"
     else:
         hint = "no activity yet"
+
+    rnd = random.Random(st["current"] * 31 + 5)
+
+    # ---- the flame that runs along the fuse: three drawings in turn, a glow, embers, and it grows as it goes
+    spark = ""
+    if live:
+        embers = []
+        for n in range(11):
+            ang, far = rnd.uniform(-2.6, -0.5), rnd.uniform(16, 38)
+            size = rnd.choice([2.5, 3, 3, 4])
+            embers.append(
+                f'<rect class="ember" x="{-size / 2 + rnd.uniform(-4, 4):.1f}" y="{-10 - size / 2:.1f}" width="{size}" height="{size}" '
+                f'fill="{rnd.choice([BUTTER, BUTTER, CORAL, "#fff6dc"])}" style="--dx:{far * math.cos(ang):.1f}px;'
+                f'--dy:{far * math.sin(ang):.1f}px;animation-duration:{rnd.uniform(0.5, 1.0):.2f}s;'
+                f'animation-delay:-{rnd.uniform(0, 1):.2f}s"/>')
+        frames = "".join(f'<g class="fr" style="animation-delay:{-0.36 + 0.12 * n if n else 0:.2f}s">{_flame(f, 4)}</g>' for n, f in enumerate(FLAMES))
+        spark = ('<g class="spark"><g class="life"><g class="grow">'
+                 '<circle class="glow" cx="0" cy="-8" r="24" fill="url(#heat)"/>'
+                 + "".join(embers) + f'<g transform="translate(0 4)">{frames}</g>'
+                 "</g></g></g>")
+
+    # ---- the rocket, its engine's flame, the smoke it leaves on the pad and behind it
+    pad = (block(rx - 23, ry + noz + 1, 46, 7, rx=3)
+           + f'<rect x="{rx - 15}" y="{ry + noz + 3.5:.1f}" width="30" height="2" rx="1" fill="{BUTTER}" opacity="0.8"/>')
+    jet = "".join(f'<g class="fr" style="animation-delay:{-0.3 + 0.1 * n if n else 0:.2f}s;animation-duration:.3s">{_flame(f, 4.4, up=False)}</g>'
+                  for n, f in enumerate(FLAMES))
+    rocket = (f'<g class="rk"><g class="rkb"><g class="jet" style="transform-origin:0 {noz:.1f}px"><g class="thrust" style="transform-origin:0 {noz:.1f}px">'
+              f'<g transform="translate(0 {noz - 1:.1f}) scale(0.78 1)">{jet}</g></g></g>{art}</g></g>')
+    smoke = ""
+    if live:
+        bits = []
+        for n in range(14):  # billows along the ground, both ways
+            side = -1 if n % 2 else 1
+            size = rnd.choice([6, 7, 8, 10])
+            bits.append(
+                f'<rect class="fx smoke" x="{rx - size / 2:.1f}" y="{ry + noz - size / 2 - 1:.1f}" width="{size}" height="{size}" rx="1" '
+                f'fill="{rnd.choice(["#f1f3fb", "#b9c1dc", "#fcecc6", "#8e98ba"])}" style="--dx:{side * rnd.uniform(14, 52):.1f}px;'
+                f'--dy:{-rnd.uniform(0, 16):.1f}px;animation-delay:{end + rnd.uniform(0, 0.9):.2f}s"/>')
+        for n in range(1, 15):  # and a trail where the rocket has been
+            f = n / 15 * (g + 0.06)
+            x, y, dx, dy = along(f * fly_len - noz - 6)
+            size = rnd.choice([5, 6, 7, 8])
+            bits.append(
+                f'<rect class="fx puff" x="{x - size / 2 + rnd.uniform(-3, 3):.1f}" y="{y - size / 2:.1f}" width="{size}" height="{size}" rx="1" '
+                f'fill="{rnd.choice(["#f1f3fb", "#fcecc6", "#b9c1dc", BUTTER])}" style="--dx:{rnd.uniform(-7, 7):.1f}px;'
+                f'--dy:{rnd.uniform(4, 14):.1f}px;animation-delay:{lift + T * f ** (1 / power) + 0.05:.2f}s"/>')
+        smoke = "".join(bits)
+
+    badge = ""
+    if record:  # where the rocket stood, once it has gone
+        bx, by = rx, ry + noz - 20
+        badge = ('<g class="badge">'
+                 f'<rect x="{bx - 25}" y="{by - 10:.1f}" width="50" height="24" rx="6" fill="{DEEP}"/>'
+                 f'<rect x="{bx - 25}" y="{by - 13:.1f}" width="50" height="24" rx="6" fill="{BUTTER}"/>'
+                 f'<text x="{bx}" y="{by + 4.5:.1f}" font-size="14" letter-spacing="1" fill="{BG}" text-anchor="middle">BEST</text>'
+                 "</g>")
+
+    # ---- the number: it counts up while the fuse burns
+    def num(text, cls, style=""):
+        return (f'<text class="{cls}" x="{cx}" y="{cy + 14}" font-size="58" font-weight="700" fill="{INK}" text-anchor="middle"'
+                f'{style}>{text}</text>')
+
+    if live:
+        steps = min(st["current"], 30)
+        vals = sorted({round(st["current"] * k / steps) for k in range(steps)})  # every value shown on the way, the last left out
+        vals = [v for v in vals if v < st["current"]]
+        slot = burn / len(vals)
+        count = "".join(
+            num(v, "cnt", f' opacity="0" style="animation:on {slot + (t0 if k == 0 else 0):.3f}s steps(1) {0 if k == 0 else t0 + k * slot:.3f}s"')
+            for k, v in enumerate(vals))
+        number = f'<g class="numg">{count}{num(st["current"], "fin")}</g>'
+    else:
+        number = num(0, "still")
 
     ls, le = st["longest_span"]
     tiles = [
@@ -276,50 +548,72 @@ def streak(st):
         ("CONTRIBUTIONS", f"{st['total']:,}", "", f"{st['active_days']} active days, last 12 months"),
         ("BEST DAY", f"{st['best_day']['count']:,}", "contribution" if st["best_day"]["count"] == 1 else "contributions", mdy(d(st["best_day"]["date"]))),
     ]
-    tx, ty, tw_, th, gap = 330, 28, 251, 106, 14
+    tx, ty, tw_, th, gap = 348, 28, 242, 106, 14  # the tiles stand clear of the pad: a lane on each side of the rocket
     tiles_svg = []
     for n, (name, big, small, sub) in enumerate(tiles):
         x = tx + (n % 2) * (tw_ + gap)
         y = ty + (n // 2) * (th + gap)
         bw = width(big, 34, bold=True)
-        tiles_svg.append(f'''
-<g class="tile" style="animation-delay:{0.15 + n * 0.12:.2f}s">
-  {block(x, y, tw_, th)}
-  {label(x + 18, y + 28, name, DIM)}
-  <text x="{x + 17}" y="{y + 68}" font-size="34" font-weight="700" fill="{INK}">{esc(big)}</text>
-  <text x="{x + 24 + bw:.0f}" y="{y + 68}" font-size="15" fill="{MUTED}">{esc(small)}</text>
-  <text x="{x + 18}" y="{y + 90}" font-size="12.5" fill="{DIM}">{esc(clip(sub, 12.5, tw_ - 34))}</text>
-</g>''')
+        tiles_svg.append(
+            f'<g class="tile" style="animation-delay:{0.15 + n * 0.12:.2f}s">'
+            + block(x, y, tw_, th)
+            + label(x + 18, y + 28, name, DIM)
+            + f'<text x="{x + 17}" y="{y + 68}" font-size="34" font-weight="700" fill="{INK}">{esc(big)}</text>'
+            f'<text x="{x + 24 + bw:.0f}" y="{y + 68}" font-size="15" fill="{MUTED}">{esc(small)}</text>'
+            f'<text x="{x + 18}" y="{y + 90}" font-size="12.5" fill="{DIM}">{esc(clip(sub, 12.5, tw_ - 34))}</text>'
+            "</g>")
 
-    # while a streak is alive the ring breathes: a soft wave leaves it every few seconds
-    halo = (f'<circle class="halo" cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="{BUTTER}" stroke-width="14" opacity="0"/>'
-            if st["current"] else "")
-    body = f'''
-<defs>
-  <linearGradient id="plume" x1="0" y1="1" x2="1" y2="0">
-    <stop offset="0" stop-color="{CORAL}"/><stop offset="1" stop-color="{BUTTER}"/>
-  </linearGradient>
-</defs>
-{frame(h)}
-{sign(40, 44, "STREAK", CORAL)}
-<circle cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="{PANEL}" stroke-width="14"/>
-<circle cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="{LINE}" stroke-width="1" stroke-dasharray="2 5" opacity="0.9"/>
-<circle class="arc" opacity="{1 if arc else 0}" cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="url(#plume)" stroke-width="14"
-  stroke-linecap="round" stroke-dasharray="{arc:.1f} {circ:.1f}" transform="rotate(-90 {rcx} {rcy + 8})"
-  style="--len:{arc:.1f}"/>
-{halo}
-<text class="num" x="{rcx}" y="{rcy + 22}" font-size="58" font-weight="700" fill="{INK}" text-anchor="middle">{st['current']}</text>
-<text x="{rcx}" y="{rcy + 46}" font-family="{MONO}" font-size="12" fill="{MUTED}" text-anchor="middle">day streak</text>
-<text x="{rcx}" y="{h - 22}" font-family="{MONO}" font-size="12" fill="{DIM}" text-anchor="middle">{esc(hint)}</text>
-{''.join(tiles_svg)}'''
-    style = (f".arc{{animation:draw 1.4s cubic-bezier(.2,.7,.2,1) .2s both}}"
-             f"@keyframes draw{{from{{stroke-dasharray:0 {circ:.1f}}}}}"
-             ".num{animation:land .55s cubic-bezier(.2,1.5,.4,1) 1.1s both;transform-box:fill-box;transform-origin:center}"
-             "@keyframes land{from{opacity:0;transform:scale(.5)}}"
-             ".halo{animation:breathe 3.2s ease-out 1.9s infinite}"
-             "@keyframes breathe{0%{opacity:.4;stroke-width:14px}70%,100%{opacity:0;stroke-width:40px}}"
-             "@media (prefers-reduced-motion: reduce){.halo{display:none}}"
-             ".tile{animation:up .5s ease-out both}@keyframes up{from{opacity:0;transform:translateY(10px)}}")
+    body = (
+        f'<defs><linearGradient id="plume" gradientUnits="userSpaceOnUse" x1="{cx - r}" y1="{cy + r}" x2="{cx + r}" y2="{cy - r}">'
+        f'<stop offset="0" stop-color="{CORAL}"/><stop offset="1" stop-color="{BUTTER}"/></linearGradient>'
+        f'<radialGradient id="heat"><stop offset="0" stop-color="{BUTTER}" stop-opacity="0.6"/>'
+        f'<stop offset="1" stop-color="{CORAL}" stop-opacity="0"/></radialGradient></defs>'
+        + frame(h)
+        + sign(40, 44, "STREAK", CORAL)
+        + f'<path d="{fuse_d}" fill="none" stroke="{LINE}" stroke-width="10"/>'
+        f'<path d="{fuse_d}" fill="none" stroke="{DIM}" stroke-width="3" stroke-dasharray="{seg * 0.42:.2f} {seg * 0.58:.2f}" opacity="0.55"/>'
+        + (f'<path class="lit" d="{fuse_d}" fill="none" stroke="url(#plume)" stroke-width="10" stroke-dasharray="{length:.1f} {length + 10:.1f}"/>' if live else "")
+        + f'<path d="{fuse_d}" fill="none" stroke="{BG}" stroke-width="12" stroke-dasharray="1.6 {seg - 1.6:.3f}"/>'
+        + pad + number
+        + f'<text x="{cx}" y="{cy + 38}" font-family="{MONO}" font-size="12" fill="{MUTED}" text-anchor="middle">day streak</text>'
+        f'<text x="{cx}" y="{h - 20}" font-family="{MONO}" font-size="12" fill="{DIM}" text-anchor="middle">{esc(hint)}</text>'
+        + "".join(tiles_svg) + badge + smoke + spark + rocket)
+
+    style = ".tile{animation:up .5s ease-out both}@keyframes up{from{opacity:0;transform:translateY(10px)}}"
+    if live:
+        keys = "".join(f"{k * 5}%{{offset-distance:{(k / 20) ** power * 100:.3f}%}}" for k in range(21))
+        style += (
+            f".lit{{animation:draw {burn}s linear {t0}s both}}@keyframes draw{{from{{stroke-dasharray:0 {length + 10:.1f}}}}}"
+            f'.spark{{offset-path:path("{fuse_d}");offset-rotate:0deg;animation:run {burn}s linear {t0}s both}}'
+            "@keyframes run{from{offset-distance:0%}to{offset-distance:100%}}"
+            f".life{{animation:ign .3s cubic-bezier(.2,1.6,.4,1) {t0}s both,out .2s ease-in {end}s forwards}}"
+            "@keyframes ign{from{transform:scale(0)}}@keyframes out{to{transform:scale(.2);opacity:0}}"
+            f".grow{{animation:grow {burn}s linear {t0}s both}}@keyframes grow{{from{{transform:scale(.8)}}to{{transform:scale(1.6)}}}}"
+            ".fr{animation:fr .36s steps(1) infinite}@keyframes fr{0%{opacity:1}33.34%,100%{opacity:0}}"
+            ".glow,.ember,.smoke,.puff,.badge{transform-box:fill-box;transform-origin:center}"
+            ".glow{animation:gl .5s steps(3) infinite}@keyframes gl{50%{opacity:.55;transform:scale(1.3)}}"
+            ".ember{animation:em .8s ease-out infinite}"
+            "@keyframes em{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.4)}}"
+            f".numg{{transform-origin:{cx}px {cy}px;animation:swell {burn}s linear {t0}s both}}@keyframes swell{{from{{transform:scale(.7)}}}}"
+            "@keyframes on{from,to{opacity:1}}"
+            f".fin{{transform-origin:{cx}px {cy}px;animation:pop .5s cubic-bezier(.2,1.7,.4,1) {end}s both}}"
+            "@keyframes pop{0%{opacity:0;transform:scale(.8)}1%{opacity:1}100%{opacity:1;transform:scale(1)}}"
+            f'.rk{{offset-path:path("{fly_d}");offset-rotate:auto 90deg;animation:fly {T}s linear {lift}s both}}'
+            f"@keyframes fly{{{keys}}}"
+            f".rkb{{animation:rumble .09s steps(2) {end}s {round((lift - end) / 0.09) + 3}}}@keyframes rumble{{50%{{transform:translate(.9px,-.5px)}}}}"
+            f".jet{{animation:fire .35s ease-out {end}s both}}@keyframes fire{{from{{transform:scale(0)}}}}"
+            f".thrust{{animation:thrust {T}s ease-in {lift}s both}}@keyframes thrust{{from{{transform:scale(.85,.3)}}to{{transform:scale(1.15,1.7)}}}}"
+            ".smoke{animation:smoke 1.7s ease-out both}"
+            "@keyframes smoke{0%{opacity:0;transform:translate(0,0) scale(.4)}14%{opacity:.85}"
+            "100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(2.3)}}"
+            ".puff{animation:puff 1.1s ease-out both}"
+            "@keyframes puff{0%{opacity:0;transform:scale(.5)}12%{opacity:.8}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(2.5)}}"
+            f".badge{{animation:land .5s cubic-bezier(.2,1.6,.4,1) {lift + 1.15:.2f}s both}}@keyframes land{{from{{opacity:0;transform:scale(.5)}}}}"
+            # a browser without motion paths gets the finished card: the number, the lit fuse, and the pad empty
+            '@supports not (offset-path:path("M0 0L1 1")){.spark,.rk,.fx{display:none}}'
+            "@media (prefers-reduced-motion: reduce){.spark,.rk,.fx,.cnt{display:none}}")
+    else:
+        style += f'.rk{{transform:translate({rx}px,{ry}px)}}.jet{{display:none}}'
     return svg(h, body, style)
 
 
@@ -499,9 +793,12 @@ def main():
         act = {}
 
     st = stats(days)
-    synced = datetime.datetime.now(TZ).date()
-    write("hero.svg", hero(st, synced))
-    write("streak.svg", streak(st))
+    card = streak(st)  # first: it says where the rocket leaves, which the banner has to match
+    if "--print-launch" in sys.argv:
+        print(json.dumps({k: v for k, v in LAUNCH.items() if k != "active"}))
+        return
+    write("streak.svg", card)
+    write("hero.svg", hero(st))
     write("contributions.svg", graph(days, st))
     write("recent.svg", activity(act))
     with open(os.path.join(ROOT, "README.md"), "w") as f:
