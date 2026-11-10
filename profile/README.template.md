@@ -5,11 +5,9 @@
 
 <div align="center">
 
-<img src="./profile/hero.svg" width="100%" alt="Allen Hsieh, Aerospace Engineering at UC Berkeley" />
+<a href="https://allenkh.com"><img src="./profile/hero.svg" width="100%" alt="Allen Hsieh, Aerospace Engineering at UC Berkeley" /></a>
 
-<a href="https://allenkh.com"><img src="./profile/link-site.svg" width="32%" alt="Website: allenkh.com" /></a>
-<a href="https://www.linkedin.com/in/allenkhsieh"><img src="./profile/link-linkedin.svg" width="32%" alt="LinkedIn: allenkhsieh" /></a>
-<a href="https://tryalai.app"><img src="./profile/link-alai.svg" width="32%" alt="alai: tryalai.app" /></a>
+<sub>{{LINKS}}</sub>
 
 <img src="./profile/streak.svg" width="100%" alt="Current and longest contribution streaks" />
 

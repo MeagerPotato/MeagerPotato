@@ -2,7 +2,7 @@
 """
 Draw the profile from data/contributions.json and data/activity.json.
 
-Writes the SVG cards and link buttons into profile/ and rebuilds README.md from
+Writes the SVG cards into profile/ and rebuilds README.md from
 profile/README.template.md. Everything is plain SVG with CSS animation, because
 GitHub shows README images as <img> and runs no JavaScript inside them.
 
@@ -210,6 +210,14 @@ def hero(st, synced):
 
     cx, cy = 690, 116
     orbit = (f'M {cx-150} {cy} A 150 46 0 1 1 {cx+150} {cy} A 150 46 0 1 1 {cx-150} {cy}')
+    chips, x = [], 40
+    for _, _, text, color in LINKS:
+        cw = round(width(text, 13) + 44)
+        chips.append(block(x, 158, cw, 28, rx=8)
+                     + f'<rect x="{x + 10}" y="167" width="10" height="10" rx="2.5" fill="{color}"/>'
+                     + f'<text x="{x + 28}" y="177" font-size="13" font-weight="600" fill="{INK}">{esc(text)}</text>')
+        x += cw + 10
+
     status = f"{st['total']:,} contributions this year · synced {mdy(synced)}"
     body = f'''
 <defs>
@@ -234,11 +242,12 @@ def hero(st, synced):
   </g>
 </g>
 <g class="in">
-  {label(40, 62, "// MEAGERPOTATO", CORAL)}
-  <text x="38" y="112" font-size="46" font-weight="700" fill="{INK}" letter-spacing="-0.5">Allen Hsieh</text>
-  <text x="40" y="142" font-size="17" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>
-  <circle class="pulse" cx="45" cy="181" r="3.5" fill="{MINT}"/>
-  <text x="56" y="185" font-family="{MONO}" font-size="12" fill="{DIM}">{esc(status)}</text>
+  {label(40, 48, "// MEAGERPOTATO", CORAL)}
+  <text x="38" y="98" font-size="46" font-weight="700" fill="{INK}" letter-spacing="-0.5">Allen Hsieh</text>
+  <text x="40" y="128" font-size="17" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>
+  {''.join(chips)}
+  <circle class="pulse" cx="45" cy="210" r="3.5" fill="{MINT}"/>
+  <text x="56" y="214" font-family="{MONO}" font-size="12" fill="{DIM}">{esc(status)}</text>
 </g>'''
     style = (".tw{animation:tw 4s ease-in-out infinite}@keyframes tw{50%{opacity:.1}}"
              ".pulse{animation:pulse 2.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.25}}"
@@ -282,6 +291,9 @@ def streak(st):
   <text x="{x + 18}" y="{y + 90}" font-size="12.5" fill="{DIM}">{esc(clip(sub, 12.5, tw_ - 34))}</text>
 </g>''')
 
+    # while a streak is alive the ring breathes: a soft wave leaves it every few seconds
+    halo = (f'<circle class="halo" cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="{BUTTER}" stroke-width="14" opacity="0"/>'
+            if st["current"] else "")
     body = f'''
 <defs>
   <linearGradient id="plume" x1="0" y1="1" x2="1" y2="0">
@@ -295,12 +307,18 @@ def streak(st):
 <circle class="arc" opacity="{1 if arc else 0}" cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="url(#plume)" stroke-width="14"
   stroke-linecap="round" stroke-dasharray="{arc:.1f} {circ:.1f}" transform="rotate(-90 {rcx} {rcy + 8})"
   style="--len:{arc:.1f}"/>
-<text x="{rcx}" y="{rcy + 22}" font-size="58" font-weight="700" fill="{INK}" text-anchor="middle">{st['current']}</text>
+{halo}
+<text class="num" x="{rcx}" y="{rcy + 22}" font-size="58" font-weight="700" fill="{INK}" text-anchor="middle">{st['current']}</text>
 <text x="{rcx}" y="{rcy + 46}" font-family="{MONO}" font-size="12" fill="{MUTED}" text-anchor="middle">day streak</text>
 <text x="{rcx}" y="{h - 22}" font-family="{MONO}" font-size="12" fill="{DIM}" text-anchor="middle">{esc(hint)}</text>
 {''.join(tiles_svg)}'''
     style = (f".arc{{animation:draw 1.4s cubic-bezier(.2,.7,.2,1) .2s both}}"
              f"@keyframes draw{{from{{stroke-dasharray:0 {circ:.1f}}}}}"
+             ".num{animation:land .55s cubic-bezier(.2,1.5,.4,1) 1.1s both;transform-box:fill-box;transform-origin:center}"
+             "@keyframes land{from{opacity:0;transform:scale(.5)}}"
+             ".halo{animation:breathe 3.2s ease-out 1.9s infinite}"
+             "@keyframes breathe{0%{opacity:.4;stroke-width:14px}70%,100%{opacity:0;stroke-width:40px}}"
+             "@media (prefers-reduced-motion: reduce){.halo{display:none}}"
              ".tile{animation:up .5s ease-out both}@keyframes up{from{opacity:0;transform:translateY(10px)}}")
     return svg(h, body, style)
 
@@ -453,34 +471,13 @@ def activity(act):
 
 # ---------------------------------------------------------------- links
 
-# An image in a README can carry one link, so the three addresses are three small images under the banner
+# An image in a README can carry one link. So the banner shows the three addresses as tags and links to the
+# first, and all three are also real text links in the line right under it.
 LINKS = [
     ("site", "https://allenkh.com", "allenkh.com", BUTTER),
-    ("linkedin", "https://www.linkedin.com/in/allenkhsieh", "allenkhsieh", SKY),
+    ("linkedin", "https://www.linkedin.com/in/allenkhsieh", "in/allenkhsieh", SKY),
     ("alai", "https://tryalai.app", "tryalai.app", MINT),
 ]
-
-
-def link(kind, text, color):
-    w, h = 284, 62
-    tx, ty = 16, 14  # the icon's tile, 28 px square
-    if kind == "site":
-        glyph = (f'<circle cx="{tx + 14}" cy="{ty + 14}" r="5.5" fill="{BG}"/>'
-                 f'<ellipse cx="{tx + 14}" cy="{ty + 14}" rx="11" ry="3.8" fill="none" stroke="{BG}" stroke-width="1.8" '
-                 f'transform="rotate(-24 {tx + 14} {ty + 14})"/>')
-    else:
-        letters = {"linkedin": ("in", 16), "alai": ("a", 20)}[kind]
-        glyph = (f'<text x="{tx + 14}" y="{ty + (20 if kind == "linkedin" else 20.5)}" font-size="{letters[1]}" font-weight="700" '
-                 f'fill="{BG}" text-anchor="middle">{letters[0]}</text>')
-    ax, ay = w - 34, 24
-    body = f'''
-{block(1, 1, w - 2, h - 5, rx=12)}
-<rect x="{tx}" y="{ty}" width="28" height="28" rx="7" fill="{color}"/>
-{glyph}
-<text x="{tx + 42}" y="{ty + 21}" font-size="20" font-weight="600" fill="{INK}">{esc(text)}</text>
-<path d="M{ax} {ay + 10} L{ax + 10} {ay} M{ax + 3} {ay} H{ax + 10} V{ay + 7}" fill="none" stroke="{DIM}" stroke-width="2"
-  stroke-linecap="round" stroke-linejoin="round"/>'''
-    return svg(h, body, w=w)
 
 
 # ---------------------------------------------------------------- readme
@@ -489,7 +486,8 @@ def readme(act):
     with open(os.path.join(OUT, "README.template.md")) as f:
         tpl = f.read()
     links = " · ".join(f'<a href="{esc(r["url"])}">{esc(r["name"])}</a>' for r in act.get("repos", []))
-    return tpl.replace("{{RECENT_LINKS}}", links or "&nbsp;")
+    mine = " · ".join(f'<a href="{esc(url)}">{esc(text)}</a>' for _, url, text, _ in LINKS)
+    return tpl.replace("{{RECENT_LINKS}}", links or "&nbsp;").replace("{{LINKS}}", mine)
 
 
 def main():
@@ -507,8 +505,6 @@ def main():
     write("streak.svg", streak(st))
     write("contributions.svg", graph(days, st))
     write("recent.svg", activity(act))
-    for kind, _, text, color in LINKS:
-        write(f"link-{kind}.svg", link(kind, text, color))
     with open(os.path.join(ROOT, "README.md"), "w") as f:
         f.write(readme(act))
     print(f"rendered: streak {st['current']}d (best {st['longest']}d), weekly {st['week_streak']}w, "
