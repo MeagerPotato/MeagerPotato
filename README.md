@@ -14,6 +14,4 @@
 
 <img src="./profile/recent.svg" width="100%" alt="What Allen has been working on recently" />
 
-<sub><a href="https://github.com/MeagerPotato/backburner">backburner</a> · <a href="https://github.com/MeagerPotato/Personal-Website">Personal-Website</a></sub>
-
 </div>
