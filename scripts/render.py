@@ -117,11 +117,12 @@ def wrap(text, size, max_w, max_lines):
     return lines
 
 
-def svg(h, body, style="", w=W):
+def svg(h, body, style="", w=W, top=0):
+    """top: where the picture begins in the drawing, for a card that is cut into strips (h is the strip's height)."""
     body = re.sub(r'font-size="([0-9.]+)"', lambda m: f'font-size="{px(float(m.group(1))):.1f}"', body)
     body = body.replace('font-weight="700"', 'font-weight="400"').replace('font-weight="600"', 'font-weight="400"')
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 {top} {w} {h}" '
         f'font-family="{SANS}">\n<style>{FONT_FACE}{style}'
         "@media (prefers-reduced-motion: reduce){*{animation:none!important;opacity:1!important;}}"
         f"</style>\n{body}\n</svg>\n"
@@ -726,6 +727,10 @@ def graph(days, st):
 
 
 def activity(act):
+    """The Recently card, cut into strips: [(address, alt text, svg)], top to bottom. An image in a README carries
+    one link, so each repo is a strip of its own inside a link to that repo, and the README stacks the strips with
+    nothing between them (see readme()). The first strip also holds the card's heading. Each cut is in the empty
+    space above the line that divides two repos."""
     pad, inner = 40, W - 80
     repos = act.get("repos", [])
     t = act.get("totals", {})
@@ -746,9 +751,11 @@ def activity(act):
         rows.append(f'<text x="{pad}" y="{y + 10}" font-size="15" fill="{MUTED}">Nothing public in the last '
                     f'{days} days.</text>')
         y += 56
+    cuts = [0]
     for n, r in enumerate(repos):
         g = [f'<g class="row" style="animation-delay:{0.1 + n * 0.15:.2f}s">']
         if n:
+            cuts.append(y - 30)
             g.append(f'<line x1="{pad}" x2="{W - pad}" y1="{y - 22}" y2="{y - 22}" stroke="{LINE}"/>')
         name = r["name"]
         g.append(f'<text x="{pad}" y="{y}" font-family="{MONO}" font-size="17" font-weight="700" fill="{INK}">{esc(name)}</text>')
@@ -784,14 +791,22 @@ def activity(act):
         g.append("</g>")
         rows.append("".join(g))
     h = y - 16
+    cuts.append(h)
 
-    body = f'''
-{frame(h)}
-{sign(pad, 44, "RECENTLY", SKY)}
-<text x="{W - pad}" y="44" font-family="{MONO}" font-size="12" fill="{MUTED}" text-anchor="end">last {days} days · {esc(summary)}</text>
-{''.join(rows)}'''
+    head = (f'{sign(pad, 44, "RECENTLY", SKY)}\n<text x="{W - pad}" y="44" font-family="{MONO}" font-size="12" fill="{MUTED}" '
+            f'text-anchor="end">last {days} days · {esc(summary)}</text>\n')
     style = ".row{animation:up .5s ease-out both}@keyframes up{from{opacity:0;transform:translateY(10px)}}"
-    return svg(h, body, style)
+    profile = f"https://github.com/{act.get('username') or 'MeagerPotato'}?tab=repositories"
+    out = []
+    for n, row in enumerate(rows):
+        body = f"\n{frame(h)}\n{head if n == 0 else ''}{row}"
+        url, alt = (repos[n]["url"], f"{repos[n]['name']}: recent work") if repos else (profile, "Nothing public recently")
+        out.append((url, alt if n else f"Recently. {alt}", svg(cuts[n + 1] - cuts[n], body, style, top=cuts[n])))
+    return out
+
+
+def recent_file(n):
+    return "recent.svg" if n == 0 else f"recent-{n + 1}.svg"
 
 
 # ---------------------------------------------------------------- links
@@ -811,8 +826,9 @@ def banner_file(key):
 
 # ---------------------------------------------------------------- readme
 
-def readme(act, pieces):
-    """pieces: the banner's pictures from hero(), left to right. They go on one line with nothing between them,
+def readme(pieces, strips):
+    """strips: the Recently card's pictures from activity(), top to bottom.
+    pieces: the banner's pictures from hero(), left to right. They go on one line with nothing between them,
     not even a space, so that they stand edge to edge; their widths are shares of the banner's. The shares add
     up to a hair under 100% (a sixth of a pixel on a desktop), so that a browser that rounds each one up still
     has room for the last on the same line."""
@@ -824,8 +840,13 @@ def readme(act, pieces):
         f'<a href="{esc(info[key][0])}"><img src="./profile/{banner_file(key)}" '
         f'width="{share // 1000}.{share % 1000:03d}%" alt="{esc(info[key][1])}" /></a>'
         for key, share, _ in pieces)
-    links = " · ".join(f'<a href="{esc(r["url"])}">{esc(r["name"])}</a>' for r in act.get("repos", []))
-    return tpl.replace("{{BANNER}}", banner).replace("{{RECENT_LINKS}}", links or "&nbsp;")
+    # The Recently card's strips stack: each is the full width, so each takes a line. align="top" hangs a picture
+    # from the top of its line, where the default stands it on the text's baseline and leaves room under it for
+    # the tails of letters: a gap between every two strips.
+    recent = "".join(
+        f'<a href="{esc(url)}"><img src="./profile/{recent_file(n)}" width="100%" align="top" alt="{esc(alt)}" /></a>'
+        for n, (url, alt, _) in enumerate(strips))
+    return tpl.replace("{{BANNER}}", banner).replace("{{RECENT}}", recent)
 
 
 def main():
@@ -847,9 +868,15 @@ def main():
     for key, _, art in pieces:
         write(banner_file(key), art)
     write("contributions.svg", graph(days, st))
-    write("recent.svg", activity(act))
+    strips = activity(act)
+    for n, (_, _, art) in enumerate(strips):
+        write(recent_file(n), art)
+    for n in range(len(strips), 12):  # strips of repos that are no longer on the card
+        stale = os.path.join(OUT, recent_file(n))
+        if os.path.exists(stale):
+            os.remove(stale)
     with open(os.path.join(ROOT, "README.md"), "w") as f:
-        f.write(readme(act, pieces))
+        f.write(readme(pieces, strips))
     print(f"rendered: streak {st['current']}d (best {st['longest']}d), weekly {st['week_streak']}w, "
           f"{st['total']} contributions, {len(act.get('repos', []))} recent repos")
 
