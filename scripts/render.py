@@ -2,12 +2,13 @@
 """
 Draw the profile from data/contributions.json and data/activity.json.
 
-Writes four SVG cards into profile/ and rebuilds README.md from
+Writes the SVG cards and link buttons into profile/ and rebuilds README.md from
 profile/README.template.md. Everything is plain SVG with CSS animation, because
 GitHub shows README images as <img> and runs no JavaScript inside them.
 
     python scripts/render.py
 """
+import base64
 import datetime
 import html
 import json
@@ -22,22 +23,36 @@ OUT = os.path.join(ROOT, "profile")
 TZ = datetime.timezone.utc
 
 W = 880
-BG = "#0a0e17"
-PANEL = "#0f1522"
-LINE = "#1c2436"
-INK = "#e8ecf4"
-MUTED = "#8a93a8"
-DIM = "#4d566b"
-HOT = "#ff8a3d"     # plume orange
-GLOW = "#ffd27a"    # plume core
-COOL = "#7dd3fc"
-LEVELS = ["#151b28", "#40220f", "#813b10", "#d8641b", "#ffb24d"]
+# The palette is allenkh.com's (src/universe/design/tokens.ts), so the profile and the site read as one thing
+BG = "#0a0f1f"      # space 900
+DEEP = "#060914"    # space 950: the ledge under a block
+PANEL = "#121a36"
+LINE = "#2c3a6b"
+INK = "#f1f3fb"
+MUTED = "#b9c1dc"
+DIM = "#8e98ba"
+CORAL = "#f19389"
+BUTTER = "#f8d98c"
+MINT = "#b8eac4"
+SKY = "#8bc0f2"
+LILAC = "#ab86bf"
+# empty, then dusk to coral to butter: brighter with every level, in the rocket plume's colours
+LEVELS = ["#172042", "#6a5585", "#b56f86", CORAL, BUTTER]
 LANG = {"TypeScript": "#3178c6", "JavaScript": "#f1e05a", "Python": "#3572a5", "C++": "#f34b7d",
         "C": "#555555", "Rust": "#dea584", "Go": "#00add8", "Java": "#b07219", "HTML": "#e34c26",
         "CSS": "#663399", "Jupyter Notebook": "#da5b0b", "MATLAB": "#e16737", "Swift": "#f05138"}
 
 MONO = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
-SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+SANS = "Outfit,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+
+# Outfit, the site's typeface, travels inside every card: an <img> may not fetch a font, but it may carry one.
+# Where a browser refuses even that, the system sans above takes over.
+FONTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+with open(os.path.join(FONTS, "outfit-latin.woff2"), "rb") as _f:
+    FONT_FACE = ("@font-face{font-family:Outfit;font-weight:100 900;src:url(data:font/woff2;base64,"
+                 + base64.b64encode(_f.read()).decode() + ") format('woff2')}")
+with open(os.path.join(FONTS, "outfit-widths.json")) as _f:
+    ADVANCE = json.load(_f)  # advance widths per em, at weights 400 and 700
 
 
 # ---------------------------------------------------------------- helpers
@@ -58,12 +73,12 @@ def mdy(date):
     return f"{date:%b} {date.day}, {date.year}"
 
 
-def width(text, size, mono=False):
-    """Rough rendered width, so text can be wrapped and trimmed without a browser."""
+def width(text, size, mono=False, bold=False):
+    """Rendered width, so text can be wrapped and trimmed without a browser."""
     if mono:
         return len(text) * size * 0.6
-    narrow, wide = set("il.,:;'|!()[] fjtr"), set("MWmw@%")
-    return sum(size * (0.32 if c in narrow else 0.88 if c in wide else 0.6) for c in text)
+    table = ADVANCE["700" if bold else "400"]
+    return sum(size * table.get(c, 0.62) for c in text)
 
 
 def clip(text, size, max_w, mono=False):
@@ -91,22 +106,33 @@ def wrap(text, size, max_w, max_lines):
     return lines
 
 
-def svg(h, body, style=""):
+def svg(h, body, style="", w=W):
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" '
-        f'font-family="{SANS}">\n<style>{style}'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
+        f'font-family="{SANS}">\n<style>{FONT_FACE}{style}'
         "@media (prefers-reduced-motion: reduce){*{animation:none!important;opacity:1!important;}}"
         f"</style>\n{body}\n</svg>\n"
     )
 
 
 def frame(h, extra=""):
-    return (f'<rect x="0.5" y="0.5" width="{W-1}" height="{h-1}" rx="14" fill="{BG}" stroke="{LINE}"/>{extra}')
+    return (f'<rect x="1" y="1" width="{W-2}" height="{h-2}" rx="15" fill="{BG}" stroke="{LINE}" stroke-width="2"/>{extra}')
 
 
-def label(x, y, text, color=HOT, anchor="start"):
-    return (f'<text x="{x}" y="{y}" font-family="{MONO}" font-size="11.5" letter-spacing="2" '
+def block(x, y, w, h, rx=10, fill=PANEL):
+    """The site's matte block: a solid plate, one hairline edge, a navy ledge under it."""
+    return (f'<rect x="{x}" y="{y + 3}" width="{w}" height="{h}" rx="{rx}" fill="{DEEP}"/>'
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{LINE}" stroke-width="2"/>')
+
+
+def label(x, y, text, color=BUTTER, anchor="start"):
+    return (f'<text x="{x}" y="{y}" font-family="{MONO}" font-size="11.5" font-weight="600" letter-spacing="2" '
             f'fill="{color}" text-anchor="{anchor}">{esc(text)}</text>')
+
+
+def sign(x, y, text, color):
+    """A card's name, as the site signs a route: a dot in the family's colour, then the name."""
+    return f'<circle cx="{x + 4}" cy="{y - 4}" r="4" fill="{color}"/>' + label(x + 16, y, text, color)
 
 
 def write(name, content):
@@ -180,26 +206,18 @@ def hero(st, synced):
         r = rnd.choice([0.6, 0.8, 0.8, 1.0, 1.3])
         o = rnd.uniform(0.25, 0.8)
         tw = f' class="tw" style="animation-delay:{rnd.uniform(0, 4):.2f}s"' if n % 4 == 0 else ""
-        stars.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="#cfd8ea" opacity="{o:.2f}"{tw}/>')
+        stars.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{INK}" opacity="{o:.2f}"{tw}/>')
 
     cx, cy = 690, 116
     orbit = (f'M {cx-150} {cy} A 150 46 0 1 1 {cx+150} {cy} A 150 46 0 1 1 {cx-150} {cy}')
-    chips, x = [], 40
-    for word in ("rockets", "robots", "software"):
-        cw = width(word, 12, mono=True) + 24
-        chips.append(f'<rect x="{x}" y="150" width="{cw:.0f}" height="24" rx="12" fill="none" stroke="{LINE}"/>'
-                     f'<text x="{x + cw/2:.0f}" y="166" font-family="{MONO}" font-size="12" fill="{MUTED}" '
-                     f'text-anchor="middle">{word}</text>')
-        x += cw + 8
-
     status = f"{st['total']:,} contributions this year · synced {mdy(synced)}"
     body = f'''
 <defs>
   <radialGradient id="glow" cx="{cx}" cy="{cy}" r="260" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="{HOT}" stop-opacity="0.22"/><stop offset="1" stop-color="{HOT}" stop-opacity="0"/>
+    <stop offset="0" stop-color="{LILAC}" stop-opacity="0.22"/><stop offset="1" stop-color="{CORAL}" stop-opacity="0"/>
   </radialGradient>
   <radialGradient id="planet" cx="0.35" cy="0.3" r="0.8">
-    <stop offset="0" stop-color="{GLOW}"/><stop offset="0.55" stop-color="{HOT}"/><stop offset="1" stop-color="#7a2a08"/>
+    <stop offset="0" stop-color="{BUTTER}"/><stop offset="0.55" stop-color="{CORAL}"/><stop offset="1" stop-color="#c3645c"/>
   </radialGradient>
   <clipPath id="card"><rect x="1" y="1" width="{W-2}" height="{h-2}" rx="13"/></clipPath>
 </defs>
@@ -210,18 +228,17 @@ def hero(st, synced):
   <g transform="rotate(-14 {cx} {cy})">
     <path d="{orbit}" fill="none" stroke="{DIM}" stroke-width="1" stroke-dasharray="3 6" opacity="0.8"/>
     <circle cx="{cx}" cy="{cy}" r="30" fill="url(#planet)"/>
-    <path d="M {cx-150} {cy} A 150 46 0 0 0 {cx+150} {cy}" fill="none" stroke="{HOT}" stroke-width="1.2" opacity="0.35"/>
-    <circle r="4.5" fill="{GLOW}"><animateMotion dur="14s" repeatCount="indefinite" path="{orbit}"/></circle>
-    <circle r="10" fill="{GLOW}" opacity="0.18"><animateMotion dur="14s" repeatCount="indefinite" path="{orbit}"/></circle>
+    <path d="M {cx-150} {cy} A 150 46 0 0 0 {cx+150} {cy}" fill="none" stroke="{CORAL}" stroke-width="1.2" opacity="0.35"/>
+    <circle r="4.5" fill="{BUTTER}"><animateMotion dur="14s" repeatCount="indefinite" path="{orbit}"/></circle>
+    <circle r="10" fill="{BUTTER}" opacity="0.18"><animateMotion dur="14s" repeatCount="indefinite" path="{orbit}"/></circle>
   </g>
 </g>
 <g class="in">
-  {label(40, 52, "// MEAGERPOTATO")}
-  <text x="38" y="102" font-size="46" font-weight="700" fill="{INK}" letter-spacing="-0.5">Allen Hsieh</text>
-  <text x="40" y="132" font-size="17" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>
-  {''.join(chips)}
-  <circle class="pulse" cx="45" cy="201" r="3.5" fill="{HOT}"/>
-  <text x="56" y="205" font-family="{MONO}" font-size="12" fill="{DIM}">{esc(status)}</text>
+  {label(40, 62, "// MEAGERPOTATO", CORAL)}
+  <text x="38" y="112" font-size="46" font-weight="700" fill="{INK}" letter-spacing="-0.5">Allen Hsieh</text>
+  <text x="40" y="142" font-size="17" fill="{MUTED}">Aerospace Engineering @ UC Berkeley</text>
+  <circle class="pulse" cx="45" cy="181" r="3.5" fill="{MINT}"/>
+  <text x="56" y="185" font-family="{MONO}" font-size="12" fill="{DIM}">{esc(status)}</text>
 </g>'''
     style = (".tw{animation:tw 4s ease-in-out infinite}@keyframes tw{50%{opacity:.1}}"
              ".pulse{animation:pulse 2.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.25}}"
@@ -255,11 +272,11 @@ def streak(st):
     for n, (name, big, small, sub) in enumerate(tiles):
         x = tx + (n % 2) * (tw_ + gap)
         y = ty + (n // 2) * (th + gap)
-        bw = width(big, 34)
+        bw = width(big, 34, bold=True)
         tiles_svg.append(f'''
 <g class="tile" style="animation-delay:{0.15 + n * 0.12:.2f}s">
-  <rect x="{x}" y="{y}" width="{tw_}" height="{th}" rx="10" fill="{PANEL}" stroke="{LINE}"/>
-  {label(x + 18, y + 28, name, MUTED)}
+  {block(x, y, tw_, th)}
+  {label(x + 18, y + 28, name, DIM)}
   <text x="{x + 17}" y="{y + 68}" font-size="34" font-weight="700" fill="{INK}">{esc(big)}</text>
   <text x="{x + 24 + bw:.0f}" y="{y + 68}" font-size="15" fill="{MUTED}">{esc(small)}</text>
   <text x="{x + 18}" y="{y + 90}" font-size="12.5" fill="{DIM}">{esc(clip(sub, 12.5, tw_ - 34))}</text>
@@ -268,11 +285,11 @@ def streak(st):
     body = f'''
 <defs>
   <linearGradient id="plume" x1="0" y1="1" x2="1" y2="0">
-    <stop offset="0" stop-color="{HOT}"/><stop offset="1" stop-color="{GLOW}"/>
+    <stop offset="0" stop-color="{CORAL}"/><stop offset="1" stop-color="{BUTTER}"/>
   </linearGradient>
 </defs>
 {frame(h)}
-{label(40, 44, "STREAK")}
+{sign(40, 44, "STREAK", CORAL)}
 <circle cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="{PANEL}" stroke-width="14"/>
 <circle cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="{LINE}" stroke-width="1" stroke-dasharray="2 5" opacity="0.9"/>
 <circle class="arc" opacity="{1 if arc else 0}" cx="{rcx}" cy="{rcy + 8}" r="{r}" fill="none" stroke="url(#plume)" stroke-width="14"
@@ -298,7 +315,7 @@ def graph(days, st):
     grid_w = cols * step - (step - cell)
     left = (W - grid_w - 28) // 2 + 28  # center the grid, leaving room for day labels
 
-    rects, months = [], []
+    rects, over, months = [], [], []
     seen = set()
     for n, x in enumerate(days):
         pos = lead + n
@@ -311,13 +328,22 @@ def graph(days, st):
             seen.update({c, key})
             if c < cols - 1 and not (n == 0 and dt.day > 21):
                 months.append(f'<text x="{cx}" y="{top - 10}" font-size="11.5" fill="{MUTED}">{dt:%b}</text>')
-        # the graph floods in left to right; days with activity flash as the wave passes
+        # the graph floods in left to right, and every active day pops as the wave reaches it: the busier
+        # the day, the further it swells and the longer it glows
         delay = c * 0.065 + row * 0.02
-        cls = "c g" if x["level"] else "c"
-        today = f' class="{cls} today"' if x["date"] == st["today"] else f' class="{cls}"'
+        lv = x["level"]
         tip = f"{x['count']} on {mdy(dt)}"
-        rects.append(f'<rect{today} x="{cx}" y="{cy}" width="{cell}" height="{cell}" rx="2.5" '
-                     f'fill="{LEVELS[x["level"]]}" style="animation-delay:{delay:.2f}s"><title>{tip}</title></rect>')
+        box = f'x="{cx}" y="{cy}" width="{cell}" height="{cell}" rx="2.5"'
+        rects.append((lv, f'<rect class="c l{lv}" {box} fill="{LEVELS[lv]}" '
+                          f'style="animation-delay:{delay:.2f}s"><title>{tip}</title></rect>'))
+        if lv >= 3:
+            over.append(f'<rect class="ping p{lv}" {box} fill="none" stroke="{LEVELS[lv]}" stroke-width="1.5" '
+                        f'style="animation-delay:{delay + 0.12:.2f}s"/>')
+        if x["date"] == st["today"]:
+            over.append(f'<rect class="today" x="{cx - 1.5}" y="{cy - 1.5}" width="{cell + 3}" height="{cell + 3}" rx="4" '
+                        f'fill="none" stroke="{INK}" stroke-width="1.5" style="animation-delay:{delay + 0.5:.2f}s"/>')
+    # busier days are drawn later, so a swelling day covers its quieter neighbours and not the other way round
+    rects = [r for _, r in sorted(rects, key=lambda t: t[0])]
 
     day_labels = "".join(
         f'<text x="{left - 10}" y="{top + r * step + 10}" font-size="10.5" fill="{DIM}" text-anchor="end">{n}</text>'
@@ -331,19 +357,28 @@ def graph(days, st):
     span = f"{mdy(first)} to {mdy(d(days[-1]['date']))}"
     body = f'''
 {frame(h)}
-{label(40, 44, "CONTRIBUTIONS")}
+{sign(40, 44, "CONTRIBUTIONS", BUTTER)}
 <text x="{W - 40}" y="44" font-size="13" fill="{MUTED}" text-anchor="end"><tspan font-weight="700" fill="{INK}">{st['total']:,}</tspan> in the last year</text>
 {''.join(months)}
 {day_labels}
 {''.join(rects)}
+{''.join(over)}
 <text x="40" y="{h - 26}" font-family="{MONO}" font-size="11" fill="{DIM}">{esc(span)}</text>
 {legend}'''
-    style = (".c{animation:pop .45s ease-out both;transform-box:fill-box;transform-origin:center}"
-             "@keyframes pop{from{opacity:0;transform:scale(.3)}}"
-             ".g{animation:pop .45s ease-out both,flash .8s ease-out both}"
-             "@keyframes flash{0%,40%{filter:brightness(2.4)}100%{filter:brightness(1)}}"
-             f".today{{stroke:{GLOW};stroke-width:1.2;animation:pop .45s ease-out both,blink 2s ease-in-out 4s infinite}}"
-             "@keyframes blink{50%{stroke-opacity:.15}}")
+    # level: (peak scale, seconds, the colour it flashes on the way)
+    swell = {1: (1.35, 0.55, "#b7a1d8"), 2: (1.7, 0.65, "#f3b3c4"), 3: (2.1, 0.8, "#ffdccd"), 4: (2.6, 0.95, "#fff6dc")}
+    style = (".c,.ping{transform-box:fill-box;transform-origin:center}"
+             ".l0{animation:in .4s ease-out both}@keyframes in{from{opacity:0;transform:scale(.3)}}"
+             + "".join(
+                 f".l{lv}{{animation:pop{lv} {sec}s cubic-bezier(.2,.8,.3,1) both}}"
+                 f"@keyframes pop{lv}{{0%{{opacity:0;transform:scale(.2)}}"
+                 f"40%{{opacity:1;transform:scale({peak});fill:{flash}}}100%{{transform:scale(1)}}}}"
+                 for lv, (peak, sec, flash) in swell.items())
+             + ".ping{animation:ping 1s ease-out both}.p4{animation-duration:1.3s}"
+             "@keyframes ping{0%{opacity:0;transform:scale(1)}15%{opacity:.9}100%{opacity:0;transform:scale(3.4)}}"
+             ".today{animation:mark .4s ease-out both,blink 2s ease-in-out 5s infinite}"
+             "@keyframes mark{from{opacity:0}}@keyframes blink{50%{stroke-opacity:.2}}"
+             "@media (prefers-reduced-motion: reduce){.ping{display:none}}")
     return svg(h, body, style)
 
 
@@ -395,7 +430,7 @@ def activity(act):
         y += 6
         for hl in r.get("highlights", [])[:3]:
             kind = hl.get("kind", "commit")
-            color = {"merged": HOT, "open": COOL}.get(kind, DIM)
+            color = {"merged": LILAC, "open": MINT}.get(kind, DIM)
             tag = {"merged": "merged", "open": "in review"}.get(kind, "commit")
             tw_ = 78
             g.append(f'<rect x="{pad}" y="{y - 13}" width="{tw_}" height="18" rx="9" fill="none" stroke="{color}" stroke-opacity="0.6"/>'
@@ -409,11 +444,43 @@ def activity(act):
 
     body = f'''
 {frame(h)}
-{label(pad, 44, "RECENTLY")}
+{sign(pad, 44, "RECENTLY", SKY)}
 <text x="{W - pad}" y="44" font-family="{MONO}" font-size="12" fill="{MUTED}" text-anchor="end">last {days} days · {esc(summary)}</text>
 {''.join(rows)}'''
     style = ".row{animation:up .5s ease-out both}@keyframes up{from{opacity:0;transform:translateY(10px)}}"
     return svg(h, body, style)
+
+
+# ---------------------------------------------------------------- links
+
+# An image in a README can carry one link, so the three addresses are three small images under the banner
+LINKS = [
+    ("site", "https://allenkh.com", "allenkh.com", BUTTER),
+    ("linkedin", "https://www.linkedin.com/in/allenkhsieh", "allenkhsieh", SKY),
+    ("alai", "https://tryalai.app", "tryalai.app", MINT),
+]
+
+
+def link(kind, text, color):
+    w, h = 284, 62
+    tx, ty = 16, 14  # the icon's tile, 28 px square
+    if kind == "site":
+        glyph = (f'<circle cx="{tx + 14}" cy="{ty + 14}" r="5.5" fill="{BG}"/>'
+                 f'<ellipse cx="{tx + 14}" cy="{ty + 14}" rx="11" ry="3.8" fill="none" stroke="{BG}" stroke-width="1.8" '
+                 f'transform="rotate(-24 {tx + 14} {ty + 14})"/>')
+    else:
+        letters = {"linkedin": ("in", 16), "alai": ("a", 20)}[kind]
+        glyph = (f'<text x="{tx + 14}" y="{ty + (20 if kind == "linkedin" else 20.5)}" font-size="{letters[1]}" font-weight="700" '
+                 f'fill="{BG}" text-anchor="middle">{letters[0]}</text>')
+    ax, ay = w - 34, 24
+    body = f'''
+{block(1, 1, w - 2, h - 5, rx=12)}
+<rect x="{tx}" y="{ty}" width="28" height="28" rx="7" fill="{color}"/>
+{glyph}
+<text x="{tx + 42}" y="{ty + 21}" font-size="20" font-weight="600" fill="{INK}">{esc(text)}</text>
+<path d="M{ax} {ay + 10} L{ax + 10} {ay} M{ax + 3} {ay} H{ax + 10} V{ay + 7}" fill="none" stroke="{DIM}" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round"/>'''
+    return svg(h, body, w=w)
 
 
 # ---------------------------------------------------------------- readme
@@ -440,6 +507,8 @@ def main():
     write("streak.svg", streak(st))
     write("contributions.svg", graph(days, st))
     write("recent.svg", activity(act))
+    for kind, _, text, color in LINKS:
+        write(f"link-{kind}.svg", link(kind, text, color))
     with open(os.path.join(ROOT, "README.md"), "w") as f:
         f.write(readme(act))
     print(f"rendered: streak {st['current']}d (best {st['longest']}d), weekly {st['week_streak']}w, "

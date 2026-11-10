@@ -7,6 +7,10 @@
 
 <img src="./profile/hero.svg" width="100%" alt="Allen Hsieh, Aerospace Engineering at UC Berkeley" />
 
+<a href="https://allenkh.com"><img src="./profile/link-site.svg" width="32%" alt="Website: allenkh.com" /></a>
+<a href="https://www.linkedin.com/in/allenkhsieh"><img src="./profile/link-linkedin.svg" width="32%" alt="LinkedIn: allenkhsieh" /></a>
+<a href="https://tryalai.app"><img src="./profile/link-alai.svg" width="32%" alt="alai: tryalai.app" /></a>
+
 <img src="./profile/streak.svg" width="100%" alt="Current and longest contribution streaks" />
 
 <img src="./profile/contributions.svg" width="100%" alt="Contribution graph for the last year" />
@@ -14,10 +18,5 @@
 <img src="./profile/recent.svg" width="100%" alt="What Allen has been working on recently" />
 
 <sub>{{RECENT_LINKS}}</sub>
-
-<br><br>
-
-<a href="https://allenkh.com"><img src="https://img.shields.io/badge/allenkh.com-0a0e17?style=for-the-badge&logo=rocket&logoColor=ff8a3d" alt="Website" /></a>
-<a href="https://www.linkedin.com/in/allenkhsieh"><img src="https://img.shields.io/badge/LinkedIn-0a0e17?style=for-the-badge&logo=linkedin&logoColor=7dd3fc" alt="LinkedIn" /></a>
 
 </div>
