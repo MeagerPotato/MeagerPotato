@@ -1,12 +1,12 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-12T00:38:14Z",
+ "fetched_at": "2026-11-12T15:07:49Z",
  "window_days": 30,
  "totals": {
   "repos": 2,
-  "commits": 13,
-  "prs_merged": 8,
-  "prs_opened": 16
+  "commits": 12,
+  "prs_merged": 7,
+  "prs_opened": 15
  },
  "repos": [
   {
@@ -44,9 +44,9 @@
    "blurb": "Allen's personal site, built as a small universe you can fly through: solar systems are passions, planets are projects, moons are\u2026",
    "language": "TypeScript",
    "stars": 0,
-   "commits": 3,
-   "prs_opened": 8,
-   "prs_merged": 3,
+   "commits": 2,
+   "prs_opened": 7,
+   "prs_merged": 2,
    "prs_open": 4,
    "highlights": [
     {
