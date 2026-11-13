@@ -13,6 +13,6 @@
 
 <img src="./profile/contributions.svg" width="100%" alt="Contribution graph for the last year" />
 
-<a href="https://github.com/MeagerPotato/backburner"><img src="./profile/recent.svg" width="100%" align="top" alt="Recently. backburner: recent work" /></a><a href="https://github.com/MeagerPotato/Personal-Website"><img src="./profile/recent-2.svg" width="100%" align="top" alt="Personal-Website: recent work" /></a>
+<a href="https://github.com/MeagerPotato/backburner"><img src="./profile/recent.svg" width="100%" align="top" alt="Recently. backburner: recent work" /></a><a href="https://github.com/MeagerPotato/Personal-Website"><img src="./profile/recent-2.svg" width="100%" align="top" alt="Personal-Website: recent work" /></a><a href="https://github.com/MeagerPotato/hearsay-dh-squad"><img src="./profile/recent-3.svg" width="100%" align="top" alt="hearsay-dh-squad: recent work" /></a><a href="https://github.com/MeagerPotato/orbital-agronomist"><img src="./profile/recent-4.svg" width="100%" align="top" alt="orbital-agronomist: recent work" /></a>
 
 </div>

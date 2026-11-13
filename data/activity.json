@@ -1,12 +1,12 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-13T06:37:56Z",
- "window_days": 30,
+ "fetched_at": "2026-11-13T19:38:06Z",
+ "window_days": 90,
  "totals": {
-  "repos": 2,
-  "commits": 12,
-  "prs_merged": 7,
-  "prs_opened": 15
+  "repos": 10,
+  "commits": 279,
+  "prs_merged": 111,
+  "prs_opened": 125
  },
  "repos": [
   {
@@ -44,9 +44,9 @@
    "blurb": "Allen's personal site, built as a small universe you can fly through: solar systems are passions, planets are projects, moons are\u2026",
    "language": "TypeScript",
    "stars": 0,
-   "commits": 2,
-   "prs_opened": 7,
-   "prs_merged": 2,
+   "commits": 87,
+   "prs_opened": 50,
+   "prs_merged": 42,
    "prs_open": 4,
    "highlights": [
     {
@@ -66,6 +66,59 @@
     }
    ],
    "last_active": "2026-10-14T18:25:32Z"
+  },
+  {
+   "name": "hearsay-dh-squad",
+   "url": "https://github.com/MeagerPotato/hearsay-dh-squad",
+   "blurb": "HEARSAY (NSA challenge, HackGT 13): detects synthetic speech and explains the call - team dh squad",
+   "language": "Python",
+   "stars": 0,
+   "commits": 2,
+   "prs_opened": 1,
+   "prs_merged": 0,
+   "prs_open": 0,
+   "highlights": [
+    {
+     "title": "Score at the organizers' P_spoof = 0.3; record the full-test-set Docker reproduction",
+     "kind": "commit",
+     "date": "2026-09-26"
+    },
+    {
+     "title": "HEARSAY: synthetic-speech detection with forensic explanations (dh squad, HackGT 13)",
+     "kind": "commit",
+     "date": "2026-09-26"
+    }
+   ],
+   "last_active": "2026-10-12T08:14:24Z"
+  },
+  {
+   "name": "orbital-agronomist",
+   "url": "https://github.com/MeagerPotato/orbital-agronomist",
+   "blurb": "Nearly 500 million of the world\u2019s ~570 million farms are smallholders under 2 ha; their crops supply about 16% of global crop-derived\u2026",
+   "language": "HTML",
+   "stars": 0,
+   "commits": 32,
+   "prs_opened": 0,
+   "prs_merged": 0,
+   "prs_open": 0,
+   "highlights": [
+    {
+     "title": "feat: localize the call page and add an expo handout",
+     "kind": "commit",
+     "date": "2026-09-26"
+    },
+    {
+     "title": "docs: devpost draft and final evidence",
+     "kind": "commit",
+     "date": "2026-09-26"
+    },
+    {
+     "title": "fix: poll live video status with POST so the origin guard accepts it",
+     "kind": "commit",
+     "date": "2026-09-26"
+    }
+   ],
+   "last_active": "2026-09-26T23:53:47Z"
   }
  ]
 }
