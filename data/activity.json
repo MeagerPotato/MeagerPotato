@@ -1,14 +1,43 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-14T13:32:04Z",
- "window_days": 90,
+ "fetched_at": "2026-11-14T22:20:04Z",
+ "window_days": 30,
  "totals": {
-  "repos": 10,
-  "commits": 279,
-  "prs_merged": 111,
-  "prs_opened": 125
+  "repos": 2,
+  "commits": 34,
+  "prs_merged": 14,
+  "prs_opened": 20
  },
  "repos": [
+  {
+   "name": "ilumina",
+   "url": "https://github.com/MeagerPotato/ilumina",
+   "blurb": "vexohacks",
+   "language": "Python",
+   "stars": 0,
+   "commits": 24,
+   "prs_opened": 12,
+   "prs_merged": 9,
+   "prs_open": 3,
+   "highlights": [
+    {
+     "title": "Show lecture memory on the dashboard and open sessions from it",
+     "kind": "open",
+     "date": "2026-11-14"
+    },
+    {
+     "title": "Measure voice evidence from Deepgram word timings",
+     "kind": "open",
+     "date": "2026-11-14"
+    },
+    {
+     "title": "Answer faster and read the student's state more surely",
+     "kind": "merged",
+     "date": "2026-11-14"
+    }
+   ],
+   "last_active": "2026-11-14T21:59:53Z"
+  },
   {
    "name": "backburner",
    "url": "https://github.com/MeagerPotato/backburner",
@@ -37,88 +66,6 @@
     }
    ],
    "last_active": "2026-10-28T07:13:35Z"
-  },
-  {
-   "name": "Personal-Website",
-   "url": "https://github.com/MeagerPotato/Personal-Website",
-   "blurb": "Allen's personal site, built as a small universe you can fly through: solar systems are passions, planets are projects, moons are\u2026",
-   "language": "TypeScript",
-   "stars": 0,
-   "commits": 87,
-   "prs_opened": 50,
-   "prs_merged": 42,
-   "prs_open": 4,
-   "highlights": [
-    {
-     "title": "Refresh the site's facts: the Fisher Lab, AFRL, CyberPatriot and VEX",
-     "kind": "open",
-     "date": "2026-10-14"
-    },
-    {
-     "title": "Add design skills for Claude Code: a house set and an exploration set",
-     "kind": "merged",
-     "date": "2026-10-14"
-    },
-    {
-     "title": "Tidy what the go-live left behind",
-     "kind": "open",
-     "date": "2026-10-14"
-    }
-   ],
-   "last_active": "2026-10-14T18:25:32Z"
-  },
-  {
-   "name": "hearsay-dh-squad",
-   "url": "https://github.com/MeagerPotato/hearsay-dh-squad",
-   "blurb": "HEARSAY (NSA challenge, HackGT 13): detects synthetic speech and explains the call - team dh squad",
-   "language": "Python",
-   "stars": 0,
-   "commits": 2,
-   "prs_opened": 1,
-   "prs_merged": 0,
-   "prs_open": 0,
-   "highlights": [
-    {
-     "title": "Score at the organizers' P_spoof = 0.3; record the full-test-set Docker reproduction",
-     "kind": "commit",
-     "date": "2026-09-26"
-    },
-    {
-     "title": "HEARSAY: synthetic-speech detection with forensic explanations (dh squad, HackGT 13)",
-     "kind": "commit",
-     "date": "2026-09-26"
-    }
-   ],
-   "last_active": "2026-10-12T08:14:24Z"
-  },
-  {
-   "name": "orbital-agronomist",
-   "url": "https://github.com/MeagerPotato/orbital-agronomist",
-   "blurb": "Nearly 500 million of the world\u2019s ~570 million farms are smallholders under 2 ha; their crops supply about 16% of global crop-derived\u2026",
-   "language": "HTML",
-   "stars": 0,
-   "commits": 32,
-   "prs_opened": 0,
-   "prs_merged": 0,
-   "prs_open": 0,
-   "highlights": [
-    {
-     "title": "feat: localize the call page and add an expo handout",
-     "kind": "commit",
-     "date": "2026-09-26"
-    },
-    {
-     "title": "docs: devpost draft and final evidence",
-     "kind": "commit",
-     "date": "2026-09-26"
-    },
-    {
-     "title": "fix: poll live video status with POST so the origin guard accepts it",
-     "kind": "commit",
-     "date": "2026-09-26"
-    }
-   ],
-   "last_active": "2026-09-26T23:53:47Z"
   }
  ]
 }
