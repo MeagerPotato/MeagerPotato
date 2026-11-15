@@ -1,12 +1,12 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-14T22:20:04Z",
+ "fetched_at": "2026-11-15T06:22:36Z",
  "window_days": 30,
  "totals": {
   "repos": 2,
-  "commits": 34,
-  "prs_merged": 14,
-  "prs_opened": 20
+  "commits": 67,
+  "prs_merged": 23,
+  "prs_opened": 32
  },
  "repos": [
   {
@@ -15,28 +15,28 @@
    "blurb": "vexohacks",
    "language": "Python",
    "stars": 0,
-   "commits": 24,
-   "prs_opened": 12,
-   "prs_merged": 9,
-   "prs_open": 3,
+   "commits": 57,
+   "prs_opened": 24,
+   "prs_merged": 18,
+   "prs_open": 6,
    "highlights": [
     {
-     "title": "Show lecture memory on the dashboard and open sessions from it",
-     "kind": "open",
-     "date": "2026-11-14"
-    },
-    {
-     "title": "Measure voice evidence from Deepgram word timings",
-     "kind": "open",
-     "date": "2026-11-14"
-    },
-    {
-     "title": "Answer faster and read the student's state more surely",
+     "title": "Camera picker: handle quick switches, busy and unplugged cameras",
      "kind": "merged",
-     "date": "2026-11-14"
+     "date": "2026-11-15"
+    },
+    {
+     "title": "Camera picker: switch to the GoPro on the hosted page",
+     "kind": "merged",
+     "date": "2026-11-15"
+    },
+    {
+     "title": "ElevenLabs backup: read each turn whole, English only, no noise interruptions",
+     "kind": "merged",
+     "date": "2026-11-15"
     }
    ],
-   "last_active": "2026-11-14T21:59:53Z"
+   "last_active": "2026-11-15T05:35:42Z"
   },
   {
    "name": "backburner",
