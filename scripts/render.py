@@ -204,6 +204,8 @@ def stats(days):
         "best_day": best_day,
         "last_active": active[-1]["date"] if active else None,
         "today": days[-1]["date"],
+        "today_count": days[-1]["count"],
+        "day_before": days[-2] if len(days) > 1 else None,
     }
 
 
@@ -435,6 +437,13 @@ def _cubic(p0, p1, p2, p3, n=120):
     return out
 
 
+def today_sub(st):
+    day, prev = d(st["today"]), st["day_before"]
+    if prev is None:
+        return f"{md(day)}, in UTC"
+    return f"{md(day)} in UTC · {prev['count']:,} on {md(d(prev['date']))}"
+
+
 def streak(st):
     """The streak as a fuse. It is coiled round the number and ends under a rocket: the flame burns round it while
     the number counts up to the streak, and when it gets there the rocket lifts off and leaves by the top of the
@@ -548,13 +557,18 @@ def streak(st):
         smoke = "".join(bits)
 
     badge = ""
-    if record:  # where the rocket stood, once it has gone
-        bx, by = rx, ry + noz - 20
-        badge = ('<g class="badge">'
+    if record:  # standing on the pad the rocket left, once it has gone: its ledge rests on the pad's top
+        bx, by = rx, ry + noz - 13
+        badge = ('<g class="badge"><g class="hop">'
                  f'<rect x="{bx - 25}" y="{by - 10:.1f}" width="50" height="24" rx="6" fill="{DEEP}"/>'
                  f'<rect x="{bx - 25}" y="{by - 13:.1f}" width="50" height="24" rx="6" fill="{BUTTER}"/>'
+                 f'<g clip-path="url(#bestclip)"><rect class="shine" x="{bx - 46}" y="{by - 16:.1f}" width="9" height="30" '
+                 f'fill="#fff6dc" opacity="0.75" transform="skewX(-20)" style="transform-origin:{bx}px {by}px"/></g>'
                  f'<text x="{bx}" y="{by + 4.5:.1f}" font-size="14" letter-spacing="1" fill="{BG}" text-anchor="middle">BEST</text>'
-                 "</g>")
+                 "</g></g>")
+        badge_clip = f'<clipPath id="bestclip"><rect x="{bx - 25}" y="{by - 13:.1f}" width="50" height="24" rx="6"/></clipPath>'
+    else:
+        badge_clip = ""
 
     # ---- the number: it counts up while the fuse burns
     def num(text, cls, style=""):
@@ -573,10 +587,12 @@ def streak(st):
     else:
         number = num(0, "still")
 
-    ls, le = st["longest_span"]
+    tc = st["today_count"]
     tiles = [
-        ("LONGEST STREAK", f"{st['longest']}", "days", f"{md(d(ls))} to {md(d(le))}" if ls else "none yet"),
         ("WEEKLY STREAK", f"{st['week_streak']}", "week" if st["week_streak"] == 1 else "weeks", "weeks in a row with activity"),
+        # the calendar's last day, as of the last refresh (every 6 hours). GitHub counts its days in UTC, so in
+        # California "today" turns over in the afternoon: the day before is named too, so a small number then reads right
+        ("TODAY", f"{tc:,}", "contribution" if tc == 1 else "contributions", today_sub(st)),
         ("CONTRIBUTIONS", f"{st['total']:,}", "", f"{st['active_days']} active days, last 12 months"),
         ("BEST DAY", f"{st['best_day']['count']:,}", "contribution" if st["best_day"]["count"] == 1 else "contributions", mdy(d(st["best_day"]["date"]))),
     ]
@@ -599,12 +615,15 @@ def streak(st):
         f'<defs><linearGradient id="plume" gradientUnits="userSpaceOnUse" x1="{cx - r}" y1="{cy + r}" x2="{cx + r}" y2="{cy - r}">'
         f'<stop offset="0" stop-color="{CORAL}"/><stop offset="1" stop-color="{BUTTER}"/></linearGradient>'
         f'<radialGradient id="heat"><stop offset="0" stop-color="{BUTTER}" stop-opacity="0.6"/>'
-        f'<stop offset="1" stop-color="{CORAL}" stop-opacity="0"/></radialGradient></defs>'
+        f'<stop offset="1" stop-color="{CORAL}" stop-opacity="0"/></radialGradient>{badge_clip}</defs>'
         + frame(h)
         + sign(40, 44, "STREAK", CORAL)
         + f'<path d="{fuse_d}" fill="none" stroke="{LINE}" stroke-width="10"/>'
         f'<path d="{fuse_d}" fill="none" stroke="{DIM}" stroke-width="3" stroke-dasharray="{seg * 0.42:.2f} {seg * 0.58:.2f}" opacity="0.55"/>'
         + (f'<path class="lit" d="{fuse_d}" fill="none" stroke="url(#plume)" stroke-width="10" stroke-dasharray="{length:.1f} {length + 10:.1f}"/>' if live else "")
+        + ("".join(f'<path class="pulse" d="{fuse_d}" fill="none" stroke="{c}" stroke-width="10" opacity="{o}" '
+                   f'stroke-dasharray="{dl} {length * 2:.0f}" style="--from:{dl + (110 - dl) / 2:.1f}px;--to:{-length - (110 - dl) / 2:.1f}px"/>'
+                   for c, o, dl in ((BUTTER, 0.6, 110), ("#fff6dc", 0.65, 56), ("#ffffff", 0.8, 18))) if live else "")
         + f'<path d="{fuse_d}" fill="none" stroke="{BG}" stroke-width="12" stroke-dasharray="1.6 {seg - 1.6:.3f}"/>'
         + pad + number
         + f'<text x="{cx}" y="{cy + 38}" font-family="{MONO}" font-size="12" fill="{MUTED}" text-anchor="middle">day streak</text>'
@@ -641,9 +660,18 @@ def streak(st):
             ".puff{animation:puff 1.1s ease-out both}"
             "@keyframes puff{0%{opacity:0;transform:scale(.5)}12%{opacity:.8}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(2.5)}}"
             f".badge{{animation:land .5s cubic-bezier(.2,1.6,.4,1) {lift + 1.15:.2f}s both}}@keyframes land{{from{{opacity:0;transform:scale(.5)}}}}"
+            # then, every 3.2 s, it hops on the pad and a glint crosses it
+            f".hop{{transform-box:fill-box;transform-origin:50% 100%;animation:hop 3.2s ease-in-out {lift + 2.2:.2f}s infinite}}"
+            "@keyframes hop{0%,30%,100%{transform:none}6%{transform:scale(1.08,.9)}13%{transform:translateY(-6px) scale(.96,1.05)}"
+            "20%{transform:none}24%{transform:scale(1.05,.94)}}"
+            f".shine{{animation:shine 3.2s ease-in-out {lift + 2.35:.2f}s infinite both}}"
+            "@keyframes shine{0%{translate:0 0}22%,100%{translate:78px 0}}"
+            # the lit fuse keeps glowing: a pulse of light runs along it, from the coil's start to the pad, every 2.6 s
+            f".pulse{{stroke-dashoffset:var(--from);animation:pulse 2.6s cubic-bezier(.45,0,.55,1) {end + 0.2:.2f}s infinite both}}"
+            "@keyframes pulse{0%{stroke-dashoffset:var(--from)}75%,100%{stroke-dashoffset:var(--to)}}"
             # a browser without motion paths gets the finished card: the number, the lit fuse, and the pad empty
             '@supports not (offset-path:path("M0 0L1 1")){.spark,.rk,.fx{display:none}}'
-            "@media (prefers-reduced-motion: reduce){.spark,.rk,.fx,.cnt{display:none}}")
+            "@media (prefers-reduced-motion: reduce){.spark,.rk,.fx,.cnt,.pulse{display:none}}")
     else:
         style += f'.rk{{transform:translate({rx}px,{ry}px)}}.jet{{display:none}}'
     return svg(h, body, style)
