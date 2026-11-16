@@ -1,14 +1,33 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-16T03:21:57Z",
+ "fetched_at": "2026-11-16T06:21:41Z",
  "window_days": 30,
  "totals": {
-  "repos": 2,
+  "repos": 3,
   "commits": 67,
   "prs_merged": 23,
-  "prs_opened": 32
+  "prs_opened": 33
  },
  "repos": [
+  {
+   "name": "Personal-Website",
+   "url": "https://github.com/MeagerPotato/Personal-Website",
+   "blurb": "Allen's personal site, built as a small universe you can fly through: solar systems are passions, planets are projects, moons are\u2026",
+   "language": "TypeScript",
+   "stars": 0,
+   "commits": 0,
+   "prs_opened": 1,
+   "prs_merged": 0,
+   "prs_open": 1,
+   "highlights": [
+    {
+     "title": "Voxel look and floating-island worlds",
+     "kind": "open",
+     "date": "2026-11-16"
+    }
+   ],
+   "last_active": "2026-11-16T03:40:32Z"
+  },
   {
    "name": "ilumina",
    "url": "https://github.com/MeagerPotato/ilumina",
