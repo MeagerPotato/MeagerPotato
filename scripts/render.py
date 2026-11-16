@@ -205,6 +205,7 @@ def stats(days):
         "last_active": active[-1]["date"] if active else None,
         "today": days[-1]["date"],
         "today_count": days[-1]["count"],
+        "day_before": days[-2] if len(days) > 1 else None,
     }
 
 
@@ -436,6 +437,13 @@ def _cubic(p0, p1, p2, p3, n=120):
     return out
 
 
+def today_sub(st):
+    day, prev = d(st["today"]), st["day_before"]
+    if prev is None:
+        return f"{md(day)}, in UTC"
+    return f"{md(day)} in UTC · {prev['count']:,} on {md(d(prev['date']))}"
+
+
 def streak(st):
     """The streak as a fuse. It is coiled round the number and ends under a rocket: the flame burns round it while
     the number counts up to the streak, and when it gets there the rocket lifts off and leaves by the top of the
@@ -582,8 +590,9 @@ def streak(st):
     tc = st["today_count"]
     tiles = [
         ("WEEKLY STREAK", f"{st['week_streak']}", "week" if st["week_streak"] == 1 else "weeks", "weeks in a row with activity"),
-        # the calendar's last day, as of the last refresh (every 6 hours); its dates are GitHub's, in UTC
-        ("TODAY", f"{tc:,}", "contribution" if tc == 1 else "contributions", f"{md(d(st['today']))}, so far" if tc else f"{md(d(st['today']))}, nothing yet"),
+        # the calendar's last day, as of the last refresh (every 6 hours). GitHub counts its days in UTC, so in
+        # California "today" turns over in the afternoon: the day before is named too, so a small number then reads right
+        ("TODAY", f"{tc:,}", "contribution" if tc == 1 else "contributions", today_sub(st)),
         ("CONTRIBUTIONS", f"{st['total']:,}", "", f"{st['active_days']} active days, last 12 months"),
         ("BEST DAY", f"{st['best_day']['count']:,}", "contribution" if st["best_day"]["count"] == 1 else "contributions", mdy(d(st["best_day"]["date"]))),
     ]
