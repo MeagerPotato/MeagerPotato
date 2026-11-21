@@ -1,12 +1,12 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-21T06:59:57Z",
+ "fetched_at": "2026-11-21T19:11:03Z",
  "window_days": 30,
  "totals": {
   "repos": 3,
-  "commits": 67,
+  "commits": 61,
   "prs_merged": 23,
-  "prs_opened": 33
+  "prs_opened": 29
  },
  "repos": [
   {
@@ -63,8 +63,8 @@
    "blurb": "Backburner paces your Claude plan's weekly usage so you use all of it without getting locked out early.",
    "language": "TypeScript",
    "stars": 0,
-   "commits": 10,
-   "prs_opened": 8,
+   "commits": 4,
+   "prs_opened": 4,
    "prs_merged": 5,
    "prs_open": 3,
    "highlights": [
