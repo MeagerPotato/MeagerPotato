@@ -1,14 +1,33 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-25T21:38:29Z",
+ "fetched_at": "2026-11-26T08:10:43Z",
  "window_days": 30,
  "totals": {
-  "repos": 3,
-  "commits": 61,
+  "repos": 4,
+  "commits": 62,
   "prs_merged": 23,
   "prs_opened": 29
  },
  "repos": [
+  {
+   "name": "animator",
+   "url": "https://github.com/MeagerPotato/animator",
+   "blurb": "A CS 61A Animator app: write a Gleam draw function and watch it animate.",
+   "language": "CSS",
+   "stars": 0,
+   "commits": 1,
+   "prs_opened": 0,
+   "prs_merged": 0,
+   "prs_open": 0,
+   "highlights": [
+    {
+     "title": "Publish the built Animator app for GitHub Pages",
+     "kind": "commit",
+     "date": "2026-11-26"
+    }
+   ],
+   "last_active": "2026-11-26T07:01:33Z"
+  },
   {
    "name": "Personal-Website",
    "url": "https://github.com/MeagerPotato/Personal-Website",
