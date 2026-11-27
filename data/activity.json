@@ -1,12 +1,12 @@
 {
  "username": "MeagerPotato",
- "fetched_at": "2026-11-26T21:27:22Z",
+ "fetched_at": "2026-11-27T08:21:35Z",
  "window_days": 30,
  "totals": {
-  "repos": 4,
-  "commits": 62,
-  "prs_merged": 23,
-  "prs_opened": 29
+  "repos": 3,
+  "commits": 58,
+  "prs_merged": 18,
+  "prs_opened": 25
  },
  "repos": [
   {
@@ -75,35 +75,6 @@
     }
    ],
    "last_active": "2026-11-15T05:35:42Z"
-  },
-  {
-   "name": "backburner",
-   "url": "https://github.com/MeagerPotato/backburner",
-   "blurb": "Backburner paces your Claude plan's weekly usage so you use all of it without getting locked out early.",
-   "language": "TypeScript",
-   "stars": 0,
-   "commits": 4,
-   "prs_opened": 4,
-   "prs_merged": 5,
-   "prs_open": 3,
-   "highlights": [
-    {
-     "title": "Run the queue on Codex too, connect other AI tools, and add one-line installers",
-     "kind": "open",
-     "date": "2026-10-28"
-    },
-    {
-     "title": "Let Claude manage Backburner from chat and Claude Code",
-     "kind": "open",
-     "date": "2026-10-28"
-    },
-    {
-     "title": "Quiet the Node 24 warning on Windows and fix the wizard's plugin line",
-     "kind": "open",
-     "date": "2026-10-28"
-    }
-   ],
-   "last_active": "2026-10-28T07:13:35Z"
   }
  ]
 }
